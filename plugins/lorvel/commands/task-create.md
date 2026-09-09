@@ -14,7 +14,7 @@ This file carries **sequence only**. **The shape of a task is not in here** — 
 
 **Write the task in the language the user wrote to you in.** This file is in English because its readers are the people installing the plugin; the task's readers are the user's own team. A description in Vietnamese gets a Vietnamese `title` and `body`; one in Japanese gets Japanese. Answering in English because this file is in English is the wrong instinct — the file is instructions to you, not a sample of the output.
 
-**Never translate identifiers.** File paths, function and column names, UI labels, error strings, and anything the user quoted stay **verbatim**. Translating them invents a second vocabulary that matches neither the code nor any later search.
+**Never translate identifiers.** File paths, function and column names, command names, UI labels, error strings, and anything the user quoted stay **verbatim**. Translating them invents a second vocabulary that matches neither the code nor any later search.
 
 If the tasks that come back at step 2 are consistently in a different language from the user's, that difference is the project's working language, not a mistake — say so and ask which to use. Do not switch on your own. Mixing languages inside one project costs more than it looks: `title` and `body` are the indexed text, so a split vocabulary weakens every duplicate check that follows.
 
@@ -119,11 +119,11 @@ This step exists because the `body` is text **you** wrote, not the user — and 
 
    ⚠️ The token lives about fifteen minutes, and everything from step 3 to here is lookups plus waiting on a human — **step 4 stretches that window further**. Expiring here is **ordinary, not a fault**. Rejected for an expired token ⇒ call `task_authoring_guide` for a fresh one and retry exactly once. Do not throw away the draft the user just approved.
 
-2. Then **one** `log_progress` on the task you created, opening with exactly this line:
+2. Then **one** `log_progress` on the task you created, opening with this line — **in the same language as the task**:
 
    > *This task was drafted by an agent via `/lorvel:task-create`; the user read and approved the content before it was written.*
 
-   Keep that line in English whatever language the task itself is in. It is a provenance marker, and a marker is only useful if it reads the same in every project.
+   Translate the sentence; keep `/lorvel:task-create` **verbatim**. That name is the part that makes the receipt findable — anyone auditing which tasks an agent drafted greps for the command, not for a sentence whose wording they would have to guess in every language. The English above is the reference wording: translate its meaning, do not add to it.
 
    The rest of the entry says briefly where the task came from: the user's own sentence, the kind chosen, any duplicate weighed at step 2 or 6, and **what step 4 turned up** — including when the answer is nothing.
 

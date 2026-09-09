@@ -60,81 +60,25 @@ Read this project's status vocabulary from `task_authoring_guide` before you rea
 
 The last row matters for projects whose vocabulary is just the four categories: with no def for *code done, not yet live*, shipped work sits in `in_progress` looking exactly like unstarted work. The log is what tells them apart — read it before deciding you are at phase 1.
 
-## Phase 1 — Read and analyse
+## The phases
 
-- Read the task's `body` and `plan` properly.
-- `search_knowledge`, two or three queries on the *identifiers* in the task — endpoint, column, function, rule name — then `get_knowledge` on the plausible hits. **Do not guess a project convention.** This is the step that keeps this command portable: the procedure lives here, the project's truth lives in Lorvel and is read at runtime.
-- Find the code the task is about. Read the repo's agent instructions file (`CLAUDE.md`, `AGENTS.md`) before the code — a rule stated there outranks your reading of the code.
-- Pull it together: what you understand, which files this will touch, what is still unclear.
+Each phase's detail sits beside this file, and **you read the file for a phase before you work that
+phase** — the steps, their order and the traps are in there. The one-line summaries below are a map,
+not the instructions; working from them is the guessing this command exists to prevent. Phase 0 can
+send you straight into the middle of this list, so read whichever file that phase lands in, not the
+ones you skipped past.
 
-→ **STOP-1**: if you have questions, ask them and wait.
+| Phase | In one line | Read first |
+|---|---|---|
+| **1** Read and analyse | The task, the knowledge, the code — then what is still unclear. Ends at **STOP-1**. | `reference/planning.md` |
+| **2** Plan | Write the plan, put a knowledge audit in it, move the task to `in_progress`. **STOP-2** with `--plan`. | *(same file)* |
+| **3** Implement | Build it, log as you go, run this repo's own gates. | `reference/building.md` |
+| **4** Review | A review pass, then every gate again. | *(same file)* |
+| **5** Hand over | Files changed by repo, move to *code done, not yet live*. Ends at **STOP-3**. | *(same file)* |
+| **6** Ship, verify, close | Push in dependency order, prove it live, audit the knowledge, close on evidence. | `reference/shipping.md` |
 
-## Phase 2 — Plan
-
-1. `task_authoring_guide` for a `token`.
-
-   ⚠️ The token lives roughly fifteen minutes, and with `--plan` step 5 sits behind a human reading a plan. Expiring here is **ordinary, not a fault**: call the guide again for a fresh token and retry once. Never drop a plan the user already approved because a token aged out.
-2. Write a plan with: **Context** · **Changes by file** · **Order of work** · **Definition of done** · **Risks and gotchas**.
-3. The order of work **must** include a **knowledge audit** step immediately before closing the task.
-4. Links inside Lorvel fields use `lorvel://task/<ref>`; when talking to the user, link the `url` from the response instead — `lorvel://` is a dead link in chat.
-5. **Write it**: `update_task` with the plan, then `log_progress` moving the task to `in_progress`.
-
-**With `--plan`** ⇒ insert **STOP-2** before step 5: show the plan in chat, wait, and only write and code once it is approved.
-
-**Without the flag** ⇒ write it and carry on — but still **print the plan once** before coding, so the user can stop you if the direction is wrong.
-
-**If this task is a subtask** — as you move it to `in_progress`, check the parent:
-
-- Parent not started and not closed ⇒ `log_progress` moving the parent to `in_progress`, with a one-line note saying which slice just began.
-- Parent already in progress ⇒ leave it alone.
-- Parent closed while this slice is still open ⇒ **tell the user**; do not reopen it yourself. Most likely it was closed deliberately.
-
-Do this in phase 2, not phase 0: the work only really starts once phase 1 is through, and stopping at STOP-1 would leave the parent wearing a status that lies.
-
-## Phase 3 — Implement
-
-- Follow the project's own conventions for structure, package manager and style. They are not in this file. Read the repo's instructions file, and `search_knowledge` for anything it does not cover — a convention you assume is a convention you are inventing.
-- `log_progress` at every meaningful step: something found, something decided, something blocking.
-- Run **this repo's gates** before handing over — the ones its CI runs, plus whatever it has locally. Find out what they are rather than assuming a stack; a project with no gates at all is itself worth telling the user about.
-- ⚠️ Where CI does **not** run a check that exists locally, the local run is the real gate, not a rehearsal. Worth knowing which is which before you rely on either.
-- Changing something a user sees ⇒ verify it yourself, in the thing that renders it. Do not hand the user a change and ask them to look.
-
-## Phase 4 — Review
-
-Get a review pass over the change — whatever review tooling this setup has — and let it apply what it finds. Then **run every gate from phase 3 again**: an automatic fix can still break a type check or a test.
-
-No review tooling here ⇒ **say so, then review it yourself** against the task's definition of done and the conventions phase 1 turned up. Do not quietly skip the step: it is the only place in this flow where the change is read as a whole rather than written a piece at a time.
-
-## Phase 5 — Hand over
-
-- Summarise for the user: **the files changed, grouped by repo**, plus a suggested commit message.
-- `log_progress` onto the def this project uses for *code complete, not yet live* — read the vocabulary from the guide; if the project has no such def, say so and stay in `in_progress` rather than inventing one.
-
-That state means **code done, not yet confirmed live**, and it covers both the wait for approval and the deploy that follows. So **`--auto` still enters it**: the flag removes the *waiting*, not the *not yet live*.
-
-→ **STOP-3**: wait for approval. **Do not commit or push on your own.** Once approved, carry straight on to phase 6 without asking again.
-
-**With `--auto`** ⇒ drop the waiting, but **still print the summary above** so the user can see what is about to ship, then go straight to phase 6. Log it as delegated in advance by the flag; do not write "waiting for approval" when nobody is waiting.
-
-**Going back to change code** — review found something, the pipeline went red, the user asked for a rework — ⇒ move the status back explicitly, targeting the exact def. Sending only the category can be a **silent no-op**: if the task is already in that category, its current def is kept, and the board goes on claiming the work is about to ship. Read the guide for how this project's defs sit inside the categories.
-
-## Phase 6 — Ship, verify, and close
-
-Enter here once the user approved at STOP-3, **or** with `--auto` and the gates green.
-
-1. **Commit and push**, one repo at a time, in **dependency order** — whatever the others build on goes first, its consumers after. If an earlier repo's pipeline is not green yet, **do not push the next one**. A chain broken in the middle is worse than nothing deployed, and with `--auto` nobody is watching.
-2. **Watch the pipeline**, if this project has one. A failure that looks transient rather than caused by the change ⇒ retry it **before** digging into the logs. No pipeline ⇒ skip to step 3 and say you did — with nothing between the push and production, that live check is the only gate left.
-3. **Verify it live.** Not "the pipeline is green" — find the change itself in what is now running: a marker string this change and only this change produced, an endpoint that answers differently, a row that now exists. A generic string proves nothing, because it was already there.
-4. **Knowledge audit** — mandatory, never skipped:
-   - `search_knowledge`, two or three queries on the identifiers you just changed; follow `links_to` / `linked_from` from any unit you created or edited.
-   - Open the candidates and look for a sentence that is **now wrong, or now missing a clause**. The second kind is the one that survives review: still true, no longer complete.
-   - `check_knowledge_conflict` before editing. **Fix in place — never append a correction under the old text**, or the unit ends up asserting both.
-   - A knowledge unit holds contract and semantics. **Cut implementation detail**; do not mirror the code, which will move without telling you.
-   - Found nothing to change? **Say that too** — "audited N units, none needed changing". Silence cannot be told apart from never having looked.
-5. `log_progress` closing the task with `status: "completed"`, carrying the evidence from step 3.
-6. **Record what stays true.** The task dies; the knowledge outlives it. Anything you learned that the code cannot say — a decision and why, a trade-off, a gotcha that cost you an hour — goes to `propose_knowledge`, not into a note on your own machine. One governed source is the whole point; a second copy in a local file is how the two start disagreeing.
-7. **If the task was a subtask**, look up what comes next: `get_task` on the parent and read its subtasks **in the order the array returns them** — that order is the implementation order, and each subtask's `position` is auxiliary, so never re-sort by it. The next slice is the first still-open one after this — unless the parent's plan states a dependency order, which wins. If that slice is **blocked** (waiting on a decision, on another slice), say where it is blocked and **do not hand over a command** — handing someone a blocked slice is inviting them into a wall. **No open slices left** ⇒ check the parent's own definition of done: close it if it is met, and if it is not, say exactly which line cannot be shown yet.
-8. **Remind the user to compact.** You cannot run `/compact` — only they can. Hand them a line to copy, naming what to keep and what to drop: keep the closed task's ref and the evidence it closed on, the knowledge that changed, any convention discovered, and what is still unfinished; drop the contents of files read, build and test output, and the diffs. Put this **last**, after the next-slice suggestion — compacting discards what they have not read yet.
+Paths are relative to `${CLAUDE_SKILL_DIR}`. If a file is missing, say so and stop — do not
+reconstruct the phase from memory.
 
 ## Boundaries
 

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "lorvel-plugins",
+  "description": "Lorvel's Claude Code plugins — commands for turning a sentence into a well-formed Lorvel task",
+  "owner": {
+    "name": "Lorvel"
+  },
+  "plugins": [
+    {
+      "name": "lorvel",
+      "description": "Author Lorvel tasks from chat: /lorvel:task-create walks a description into a task the guide's own shape approves of",
+      "category": "productivity",
+      "source": "./plugins/lorvel"
+    }
+  ]
+}

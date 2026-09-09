@@ -82,13 +82,18 @@ The plugin directory can be symlinked into a project so edits take effect
 without reinstalling. From the project root:
 
 ```bash
-mkdir -p .claude/commands
-ln -s ../../agent-plugins/plugins/lorvel/commands .claude/commands/lorvel
+mkdir -p ~/.claude/skills
+ln -s /path/to/agent-plugins/plugins/lorvel ~/.claude/skills/lorvel
 ```
 
-Naming the symlink `lorvel` matters: a directory under `.claude/commands/`
-becomes the typed namespace, so the command stays `/lorvel:task-create` —
-the same name the installed plugin gives it.
+Point it at the **plugin root**, not a directory inside it. A plugin sitting
+under `~/.claude/skills/` loads on its own as `lorvel@skills-dir`, at user
+scope, so the commands are there in every project rather than only this one.
+`claude plugin list` shows it once it has loaded.
+
+The symlink's own name is not what you type: the prefix comes from `name` in
+`plugin.json`, so the commands stay `/lorvel:task-create` and
+`/lorvel:task-work` — the same names the installed plugin gives them.
 
 Keep one source at a time. With the symlink in place *and* the published
 plugin installed, `/lorvel:task-create` has two copies behind it and which one

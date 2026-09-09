@@ -1,4 +1,5 @@
 ---
+name: task-create
 description: Step 1 — create a Lorvel task from a description
 argument-hint: [what needs doing]
 disable-model-invocation: true

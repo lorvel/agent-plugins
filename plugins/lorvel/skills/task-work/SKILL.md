@@ -1,4 +1,5 @@
 ---
+name: task-work
 description: Work one Lorvel task end to end, with stop gates
 argument-hint: <task-ref> [--plan] [--auto]
 disable-model-invocation: true

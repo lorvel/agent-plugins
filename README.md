@@ -82,6 +82,13 @@ Naming the symlink `lorvel` matters: a directory under `.claude/commands/`
 becomes the typed namespace, so the command stays `/lorvel:task-create` —
 the same name the installed plugin gives it.
 
+Keep one source at a time. With the symlink in place *and* the published
+plugin installed, `/lorvel:task-create` has two copies behind it and which one
+you edit stops being obvious — so uninstall the plugin while developing, and
+drop the symlink once you switch back to the published copy.
+
+Validate the manifests before pushing:
+
 ```bash
 claude plugin validate .
 ```

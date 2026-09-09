@@ -17,6 +17,19 @@ The user saying *"let me approve the plan first"* or *"don't code yet"* counts a
 
 This file carries **sequence only**. What is specific to a project — its status vocabulary, its gates, how it ships — is **not in here**, and must not be written into here later. Ask at runtime: `task_authoring_guide` for the fields and this project's status vocabulary, `search_knowledge` for the conventions and gotchas the team already settled. If you catch yourself about to *recall* one of those instead of reading it, stop and go read it.
 
+## Language
+
+You are handed a ref, not prose — so **the task itself tells you which language to work in.** Read its `title`, `body`, `plan` and existing log at phase 0 and follow them: a task written in Vietnamese gets Vietnamese replies, a Vietnamese plan and Vietnamese progress notes. Answering in English because this file is in English is the wrong instinct — the file is instructions to you, not a sample of the output. What you write back outlives the session and is read by the team who wrote the task, so it belongs in their language, not yours.
+
+Two things do **not** follow the task:
+
+- **The user's own words win for chat.** If they speak at a stop gate in another language, answer in the one they used. Nobody should have to read your reply in a language they did not choose. The task still governs what you *write into Lorvel* — so a Vietnamese conversation about an English task means Vietnamese in chat and English in the plan and the log, and that split is correct rather than sloppy.
+- **Knowledge units follow the knowledge base**, not the task. Phase 1's `search_knowledge` results show which language the team keeps knowledge in; a unit written against the grain of the rest of the store is a unit their next search finds less well.
+
+**Never translate identifiers.** File paths, function and column names, command names, task refs, UI labels, error strings, and anything quoted stay **verbatim**. Translating them invents a second vocabulary that matches neither the code nor any later search.
+
+Nothing to judge from — a bare title, an empty body — ⇒ fall back to the language the user wrote to you in; with none of that either, ask in one line rather than quietly picking for them.
+
 ## Stop gates
 
 | | Where | On when | Rule |
@@ -44,7 +57,10 @@ Two more rules hold whatever the flags say.
    ⛔ Reporting missing tools means **reporting that they are missing** — nothing more. Do not go digging through MCP config files to diagnose it, and **never print a token, bearer or key**, not even truncated. Users can open their own files; printing it pushes their secret into a chat window they may copy elsewhere.
 2. **Subtask guard**: the task has subtasks ⇒ **STOP**. List them with their status and ask which one to work. Splitting work into slices is the user's call, not yours.
 3. **Closed guard**: already in the `completed` category ⇒ say so and ask before redoing anything.
-4. Work out which phase you are entering, and **say which one**.
+4. **Note the task's language** from what you just read, and say which one you will be working in.
+   Everything from here — replies, the plan, every log entry — follows it. Deciding this once, out
+   loud, at the top is what stops a run from drifting into English three logs later.
+5. Work out which phase you are entering, and **say which one**.
 
 Read this project's status vocabulary from `task_authoring_guide` before you read the table below. Status *categories* (`todo` / `in_progress` / `completed` / `dropped`) are the same everywhere; the *defs* over them are each project's own. A def name you remember from somewhere else is a project-fact you invented.
 

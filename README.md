@@ -19,14 +19,22 @@ claude plugin install lorvel@lorvel-plugins
 | Command | What it does |
 |---|---|
 | `/lorvel:task-create` | Turns a one-line description into a Lorvel task, asking for what's missing and showing you the full draft before anything is written. |
+| `/lorvel:task-work` | Works one task from reading it through to closing it: analyse, plan, implement, review, ship, audit the knowledge, close. Stop gates before planning and before committing. |
 
 `/lorvel:task-create` needs a connected Lorvel MCP server with write access. It
 checks for that up front and stops if the tools aren't there, rather than
 writing a malformed task.
 
-The command carries **sequence, not shape**: the shape of a task comes from
-`task_authoring_guide` at runtime, so a project's own field rules and status
-vocabulary win over anything hardcoded here.
+`/lorvel:task-work` assumes your setup already has a way to review a change and a
+way to commit one; it says when to reach for them and leaves the choice to you.
+It never commits or pushes on its own unless you pass `--auto`, and even then a
+change with no undo — a migration, a deploy pin — falls back to waiting for you.
+
+Both commands carry **sequence, not shape**. What is specific to a project — its
+field rules, its status vocabulary, its conventions — is read at runtime from
+`task_authoring_guide` and `search_knowledge`, so the project's own answers win
+over anything written into these files. That split is deliberate: a procedure that
+hardcodes a project's facts drifts away from them the moment they change.
 
 ## Updating
 

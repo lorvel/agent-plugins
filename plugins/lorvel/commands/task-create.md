@@ -1,124 +1,134 @@
 ---
-description: Bước 1 — tạo task Lorvel từ một câu mô tả
-argument-hint: [mô tả việc cần làm]
+description: Step 1 — create a Lorvel task from a description
+argument-hint: [what needs doing]
 disable-model-invocation: true
 ---
 
-Tạo một task trên Lorvel từ mô tả: **$ARGUMENTS**
+Create a task on Lorvel from this description: **$ARGUMENTS**
 
-Không có mô tả nào ⇒ hỏi user trước khi làm bất cứ việc gì khác.
+No description given ⇒ ask the user before doing anything else.
 
-File này chỉ mang **trình tự**. **Khuôn nội dung không nằm ở đây** — nó do `task_authoring_guide` trả về lúc chạy. Đừng viết task bằng thứ bạn nhớ về Lorvel.
+This file carries **sequence only**. **The shape of a task is not in here** — it comes from `task_authoring_guide` at runtime. Do not write a task out of what you remember about Lorvel.
 
-## 1. Lấy guide, và kiểm đủ tool trước khi làm mất thời gian của user
+## Language
 
-Gọi `task_authoring_guide`. Giữ `token` **và đọc trọn phần guide nó trả về**.
+**Write the task in the language the user wrote to you in.** This file is in English because its readers are the people installing the plugin; the task's readers are the user's own team. A description in Vietnamese gets a Vietnamese `title` and `body`; one in Japanese gets Japanese. Answering in English because this file is in English is the wrong instinct — the file is instructions to you, not a sample of the output.
 
-Guide là nguồn duy nhất cho: task có những field nào và field nào chứa gì, từ vựng status của project này, cú pháp link, và luật của từng field. Nếu bạn thấy mình đang định *nhớ ra* một trong những thứ đó thay vì đọc — dừng và đọc.
+**Never translate identifiers.** File paths, function and column names, UI labels, error strings, and anything the user quoted stay **verbatim**. Translating them invents a second vocabulary that matches neither the code nor any later search.
 
-Không gọi được tool này ⇒ **dừng ở đây và nói rõ là thiếu nó.** Đừng soạn tiếp: không có guide thì không có khuôn, và một task đúng hình thức mà sai khuôn còn tệ hơn không có task.
+If the tasks that come back at step 2 are consistently in a different language from the user's, that difference is the project's working language, not a mistake — say so and ask which to use. Do not switch on your own. Mixing languages inside one project costs more than it looks: `title` and `body` are the indexed text, so a split vocabulary weakens every duplicate check that follows.
 
-⛔ Báo thiếu tool thì **chỉ báo là thiếu**. Đừng đi lục file cấu hình MCP để chẩn đoán hộ, và **tuyệt đối không in ra token / bearer / khoá** — kể cả cắt ngắn, kể cả để "cho user dễ đối chiếu". User tự mở file của họ được; bạn in ra là đẩy bí mật của họ vào một khung chat mà họ có thể copy đi nơi khác.
+## 1. Get the guide, and check the tools before spending the user's time
 
-Rồi kiểm luôn: `check_similar_tasks`, `create_task`, `log_progress` có mặt không. Thiếu một tool **ghi**, hoặc credential chỉ có quyền đọc ⇒ **nói ngay bây giờ**. Năm bước dưới phần lớn là chờ con người trả lời; phát hiện không ghi được ở bước cuối là bắt user trả lời xong rồi mới bảo công cốc.
+Call `task_authoring_guide`. Keep the `token` **and read the whole guide it returns**.
 
-`search_knowledge` thì khác: nó là tool **đọc**, bước 4 dùng tới. Thiếu nó **không chặn** — ghi nhận rồi đi tiếp.
+The guide is the only source for: which fields a task has and what belongs in each, this project's status vocabulary, link syntax, and the rule for each field. If you catch yourself about to *recall* one of those instead of reading it — stop and read.
 
-## 2. Kiểm trùng
+Cannot call this tool ⇒ **stop here and say plainly that it is missing.** Do not draft anyway: no guide means no shape, and a task that is well-formed but wrongly shaped is worse than no task.
 
-Nháp một `title` từ mô tả của user (chưa cần biết loại việc, chưa cần đủ chi tiết) rồi gọi `check_similar_tasks`.
+⛔ Reporting a missing tool means **reporting that it is missing** — nothing more. Do not go digging through MCP config files to diagnose it on the user's behalf, and **never print a token, bearer or key** — not truncated, not "so you can compare it against yours". Users can open their own files; printing it pushes their secret into a chat window they may copy elsewhere.
 
-⚠️ **Đọc các match, đừng lọc theo `verdict`.** Một bản gần trùng thật có thể về với `verdict: distinct` và similarity thấp — vì nháp của bạn dài một câu, còn task đang có thì body đã dày, nên hai vector lệch nhau vì một lý do chẳng liên quan gì tới chuyện có cùng việc hay không. Task nào càng được làm kỹ thì càng dễ bị đánh giá thấp ở đây.
+Then check the rest: are `check_similar_tasks`, `create_task`, `log_progress` present? A missing **write** tool, or a read-only credential ⇒ **say so now**. The five steps below are mostly spent waiting on a human; discovering at the last one that you cannot write means the user answered everything for nothing.
 
-Bất cứ match nào **có thể** là cùng một việc:
+`search_knowledge` is different: it is a **read** tool, used at step 4. Missing it **does not block** — note it and carry on.
 
-1. **Nêu nó ra cho user** — ref, link, và cả verdict lẫn similarity mà tool trả về.
-2. Hỏi: mở rộng task đó, hay đây thật sự là việc khác?
-3. User chưa trả lời thì **chưa tạo gì cả**.
+## 2. Check for duplicates
 
-Bước này đứng đầu vì nó rẻ và nó cắt được mọi bước sau: việc đã có task rồi thì đừng tiêu một lượt hỏi nào của user.
+Draft a `title` from the user's description — no need to know the kind of work yet, no need for full detail — and call `check_similar_tasks`.
 
-## 3. Phân loại việc
+⚠️ **Read the matches; do not filter on `verdict`.** A real near-duplicate can come back as `verdict: distinct` with low similarity, because your draft is one sentence long while the existing task already has a thick body — the two vectors sit apart for a reason that has nothing to do with whether they are the same work. The better developed a task is, the lower it tends to score here.
 
-Dùng `AskUserQuestion`, một câu, ba lựa chọn:
+Any match that **could** be the same work:
 
-- **Bug** — có cái đang chạy sai
-- **Thay đổi** — thêm hoặc sửa hành vi có chủ ý
-- **Spike** — chưa biết đủ, cần tìm hiểu trước
+1. **Show it to the user** — ref, link, and both the verdict and the similarity the tool returned.
+2. Ask: extend that task, or is this genuinely different work?
+3. Until they answer, **create nothing**.
 
-Loại này **không phải field của Lorvel**. Nó chỉ quyết định bước 5 hỏi gì. User chọn "Other" và tự gọi tên loại của họ thì nhận nguyên, đừng nhét lại vào ba ô trên.
+This step comes first because it is cheap and it can cut every step after it: work that already has a task should not cost the user a single question.
 
-## 4. Lấy bối cảnh: KU trước, rồi code
+## 3. Classify the work
 
-Bước này để **bạn đủ hiểu việc**, không phải để bạn giải nó.
+Use `AskUserQuestion`, one question, three options:
 
-**KU — thứ team đã chốt mà code không nói ra.** 2–3 truy vấn `search_knowledge` theo *identifier* trong câu của user (tên màn hình, endpoint, cột, hàm, tên luật) — theo identifier chứ không phải quăng cả câu vào. Ứng viên nào có vẻ trúng thì `get_knowledge` mở đọc. Đây là chỗ duy nhất trong luồng bạn gặp được **quy ước, quyết định cũ và gotcha đã ghi** — thứ user thường quên kể vì với họ nó hiển nhiên.
+- **Bug** — something that runs is wrong
+- **Change** — deliberately add or alter behaviour
+- **Spike** — not enough is known yet, find out first
 
-**Code — việc này chạm vào đâu.** Chỉ làm khi phiên đang ở trong một codebase. Đọc đủ để trả lời hai câu: chỗ đó **hiện đang** làm gì, và yêu cầu của user sẽ **động vào** đâu.
+This kind is **not a Lorvel field**. It only decides what step 5 asks. If the user picks "Other" and names their own kind, take it as given — do not push it back into the three above.
 
-⛔ **Ranh giới — bước này rất dễ phình thành việc khác:**
+## 4. Gather context: knowledge first, then code
 
-- **Không thiết kế bản sửa.** Không chọn cách làm, không viết plan, không chia lát. Task còn chưa tồn tại.
-- **Chỉ đọc, không sửa file nào.**
-- **Có đáy.** Vài truy vấn, vài file. Thấy việc lớn hơn tưởng thì *đó chính là thứ đáng ghi vào task* — không phải lý do đọc tiếp cho hết.
-- **Không có codebase, hoặc không có `search_knowledge` ⇒ bỏ đúng nửa đó, đi tiếp, và nói cho user biết đã bỏ.** Đây không phải chốt chặn như tool ghi ở bước 1.
+This step is for **understanding the work**, not for solving it.
 
-Thứ tìm được dùng vào **hai chỗ**:
+**Knowledge — what the team already settled and the code cannot say.** Two or three `search_knowledge` queries on the *identifiers* in the user's sentence (screen name, endpoint, column, function, rule name) — on identifiers, not the whole sentence thrown in. Open the plausible hits with `get_knowledge`. This is the only point in the flow where you meet the **conventions, past decisions and recorded gotchas** a user tends to leave out because to them they are obvious.
 
-1. **Bước 5 hỏi sắc hơn.** Code lộ ra hai đường đăng nhập thì hỏi thẳng "đường nào", đừng hỏi chung chung. Và **cái KU đã trả lời thì đừng hỏi lại** — hỏi user thứ team đã chốt là làm phiền họ bằng chính tri thức của họ.
-2. **`body` ở bước 6** mang được phạm vi thật: việc này đụng vào đâu, KU nào đang ràng buộc nó. Ghi **link** tới KU, **đừng chép nội dung KU vào body** — chép là đẻ ra bản sao thứ hai, và bản sao thì sẽ lệch.
+**Code — where this request lands.** Only when the session is inside a codebase. Read enough to answer two things: what that area **does today**, and what the request would **touch**.
 
-Tra mà không thấy gì cũng **phải nói ra** ở bước 6: "đã tra KU và code, không thấy ràng buộc nào" khác hẳn im lặng — im lặng thì người đọc sau không phân biệt được *đã tra và không có* với *chưa tra*.
+⛔ **Boundaries — this step turns into a different job very easily:**
 
-## 5. Hỏi những gì còn thiếu — KHÔNG ĐƯỢC BỎ BƯỚC NÀY
+- **Do not design the fix.** No approach, no plan, no slicing into subtasks. The task does not even exist yet.
+- **Read only. Change no files.**
+- **There is a floor.** A few queries, a few files. Finding the work is bigger than it looked *is itself something to put in the task* — not a reason to keep reading to the end.
+- **No codebase, or no `search_knowledge` ⇒ skip that half, carry on, and tell the user you skipped it.** This is not a gate like the write tools at step 1.
 
-Đây là bước hay bị bỏ nhất, và là bước làm nên khác biệt giữa một task dùng được và một task phải viết lại.
+What you find is used in **two places**:
 
-Đối chiếu câu của user với những gì guide đòi, **và với thứ bước 4 vừa tìm được**. Chỗ nào user chưa nói thì **hỏi**, đừng suy ra rồi viết vào. Chỗ nào KU đã trả lời thì **đừng hỏi** — nêu ra là đã biết, và hỏi lại cho chắc nếu nó mâu thuẫn với câu của user.
+1. **Step 5 asks sharper.** If the code shows two login paths, ask which one rather than something vague. And **do not ask what the knowledge base already answered** — say you already know it. Asking users about something their own team settled is bothering them with their own knowledge.
+2. **The `body` at step 6** carries real scope: what this touches, and which knowledge units constrain it. Write **links** to them; **do not copy their content into the body** — a copy is a second version, and it will drift.
 
-Hỏi theo loại đã chọn ở bước 3:
+Finding nothing must also **be said** at step 6: "searched knowledge and code, found no constraints" is not the same as silence — silence leaves the next reader unable to tell *looked and found nothing* from *never looked*.
 
-- **Bug** — đang xảy ra gì, đáng ra phải thế nào, thấy ở đâu
-- **Thay đổi** — xong thì cái gì khác đi, và làm sao biết là xong
-- **Spike** — câu hỏi cần trả lời là gì, và cái gì thì đủ để kết thúc
-- **Loại user tự gọi tên** — tự suy ra bộ câu hỏi tương đương cho loại đó. Vẫn phải hỏi, và vẫn không được ép về ba ô trên.
+## 5. Ask what is missing — DO NOT SKIP THIS STEP
 
-Gộp được thì gộp vào một lượt `AskUserQuestion`, nhưng **thà hỏi còn hơn đoán**.
+This is the step most often skipped, and the one that separates a task worth having from a task somebody has to rewrite.
 
-Session không có `AskUserQuestion` ⇒ hỏi bằng text, và khi đó gộp luôn câu phân loại của bước 3 vào cùng lượt là được. Thiếu công cụ để hỏi **không** phải lý do để bỏ hỏi.
+Hold the user's sentence against what the guide asks for, **and against what step 4 turned up**. Where the user has not said, **ask** — do not infer it and write it in. Where knowledge already answered, **do not ask** — say you know it, and only raise it if it contradicts what the user said.
 
-`priority`: user chưa nói thì **không hỏi và không set**. Guide đã nói việc để trống nghĩa là gì — đọc ở đó. Đừng bày ra một danh sách mức để user chọn cho có.
+Ask by the kind chosen at step 3:
 
-## 6. Kiểm trùng lần hai, rồi trình bản nháp — KHÔNG ĐƯỢC BỎ BƯỚC NÀY
+- **Bug** — what happens, what should happen instead, where it shows
+- **Change** — what is different once it is done, and how anyone knows it is done
+- **Spike** — what question needs answering, and what counts as enough to stop
+- **A kind the user named themselves** — work out the equivalent questions for it. Still ask, and still do not force it back into the three above.
 
-Giờ mới có `title` + `body` đầy đủ. **Gọi `check_similar_tasks` lần nữa với bản đầy đủ đó** — lần ở bước 2 chạy trên nháp mỏng nên nó là phép đo yếu nhất; lần này là phép đo thật. Ra match mới thì xử như bước 2.
+Batch them into one `AskUserQuestion` where you can, but **asking beats guessing**.
 
-Rồi trình cho user xem **toàn văn** những gì sắp ghi: `title`, `body`, loại đã chọn, và mọi field khác bạn định gửi.
+No `AskUserQuestion` in this session ⇒ ask in text, and fold step 3's classification into the same round. Having no tool to ask with is **not** a reason to stop asking.
 
-Hỏi bằng `AskUserQuestion`: **Tạo / Sửa / Huỷ**.
+`priority`: if the user has not said, **do not ask and do not set it**. The guide already says what leaving it empty means — read it there. Do not lay out a menu of levels for the sake of it.
 
-- **Sửa** ⇒ nhận góp ý và trình lại. Lặp đến khi user đồng ý.
-- **Huỷ** ⇒ dừng lệnh, và nói rõ là chưa ghi gì lên Lorvel.
-- Chỉ **Tạo** mới được đi sang bước 7.
+## 6. Check duplicates again, then show the draft — DO NOT SKIP THIS STEP
 
-User nói *"tuỳ bạn"* hoặc *"sao cũng được"*: **đó không phải chấp thuận.** Đưa đề xuất cụ thể của bạn, rồi xin xác nhận tường minh cho chính đề xuất đó.
+Only now do you have a full `title` + `body`. **Call `check_similar_tasks` again with that full version** — the run at step 2 was on a thin draft and was the weakest measurement; this one is the real one. Handle new matches as in step 2.
 
-Bước này tồn tại vì `body` là văn bản **bạn** viết, không phải user viết — và nó là văn bản được đánh chỉ mục, nên một câu sai lọt vào đây sẽ đi tiếp vào mọi lần tìm task sau này. Đây là chỗ duy nhất trong luồng có con người đọc nó.
+Then show the user **the whole text** of what is about to be written: `title`, `body`, the kind chosen, and every other field you intend to send.
 
-## 7. Ghi
+Ask with `AskUserQuestion`: **Create / Edit / Cancel**.
 
-1. `create_task`, kèm `token` từ bước 1.
+- **Edit** ⇒ take the notes and show it again. Repeat until they agree.
+- **Cancel** ⇒ stop the command, and say plainly that nothing was written to Lorvel.
+- Only **Create** may go on to step 7.
 
-   ⚠️ Token chỉ sống khoảng mười lăm phút, mà từ bước 3 tới đây là tra cứu cộng chờ con người trả lời — **bước 4 còn kéo dài quãng đó ra**. Nên hết hạn ở chỗ này là **chuyện thường, không phải lỗi**. Bị từ chối vì token hết hạn ⇒ gọi lại `task_authoring_guide` lấy token mới rồi thử lại đúng một lần. Đừng bỏ bản nháp user vừa chấp thuận.
+If the user says *"up to you"* or *"whatever works"*: **that is not approval.** Put your specific proposal in front of them and ask for explicit confirmation of that proposal.
 
-2. Rồi **một** `log_progress` lên task vừa tạo, mở đầu bằng đúng dòng này:
+This step exists because the `body` is text **you** wrote, not the user — and it is indexed text, so one wrong sentence here travels into every future task search. This is the only point in the flow where a human reads it.
 
-   > *Task này do agent soạn qua `/lorvel:task-create`; nội dung đã được người dùng đọc và chấp thuận trước khi ghi.*
+## 7. Write
 
-   Phần còn lại của entry nói ngắn gọn task được soạn từ đâu: câu user gõ, loại đã chọn, task trùng đã cân nếu bước 2 hoặc 6 có match, và **bước 4 đã tra được gì** — kể cả khi câu trả lời là không thấy gì.
+1. `create_task`, with the `token` from step 1.
 
-   Call này fail ⇒ thử lại một lần, rồi **nói rõ với user là task đã tạo nhưng chưa có entry xuất xứ**. Đừng im lặng: entry đó là chỗ duy nhất ghi lại rằng task này do agent soạn.
+   ⚠️ The token lives about fifteen minutes, and everything from step 3 to here is lookups plus waiting on a human — **step 4 stretches that window further**. Expiring here is **ordinary, not a fault**. Rejected for an expired token ⇒ call `task_authoring_guide` for a fresh one and retry exactly once. Do not throw away the draft the user just approved.
 
-3. Báo cho user bằng `[<ref>](<url>)`, lấy `url` từ response — đừng tự dựng URL.
+2. Then **one** `log_progress` on the task you created, opening with exactly this line:
 
-Xong mục 3 là **hết lệnh**. Đừng tự đi tiếp sang lên plan hay triển khai task vừa tạo — đó là việc khác, user sẽ tự gọi khi họ muốn.
+   > *This task was drafted by an agent via `/lorvel:task-create`; the user read and approved the content before it was written.*
+
+   Keep that line in English whatever language the task itself is in. It is a provenance marker, and a marker is only useful if it reads the same in every project.
+
+   The rest of the entry says briefly where the task came from: the user's own sentence, the kind chosen, any duplicate weighed at step 2 or 6, and **what step 4 turned up** — including when the answer is nothing.
+
+   This call fails ⇒ retry once, then **tell the user the task exists but has no provenance entry**. Do not go quiet: that entry is the only record that an agent drafted this.
+
+3. Report back to the user as `[<ref>](<url>)`, taking `url` from the response — do not build the URL yourself.
+
+Finishing item 3 is **the end of the command**. Do not carry on into planning or implementing the task you just made — that is different work, and the user will ask for it when they want it.

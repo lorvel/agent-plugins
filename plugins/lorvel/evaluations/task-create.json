@@ -1,0 +1,103 @@
+{
+  "command": "lorvel:task-create",
+  "note": "These criteria were written BEFORE the command body, so they describe what the command should do rather than what it happens to do. The case shape (query / context / expected_behavior / success_criteria) is borrowed from the Notion plugin's evaluations. Read them by hand — see `runner` for why this file is not the shape the first-party runner executes.",
+  "cases": [
+    {
+      "id": "ambiguous-input",
+      "query": "/lorvel:task-create fix the login thing",
+      "context": "Lorvel MCP connected. The user's sentence says neither what is wrong nor what fixing it would mean. No priority mentioned.",
+      "expected_behavior": [
+        "Call `task_authoring_guide` before anything else, keep the token, AND check that the write tools are present.",
+        "Use no remembered rule about fields, status or priority — only what the guide just returned.",
+        "Call `check_similar_tasks` with a draft title IMMEDIATELY, before spending any of the user's turns on questions.",
+        "Once nothing duplicates: ask the user to pick a kind (bug / change / spike).",
+        "After classifying, gather context before asking: `search_knowledge` on the identifiers in the user's sentence, not the whole sentence.",
+        "Running outside a codebase ⇒ skip the read-the-code half, SAY it was skipped, and carry on — do not stop, do not invent an architecture.",
+        "Ask at least one clarifying question: what is happening, versus what should happen instead.",
+        "Do NOT set `priority`, and do NOT lay out a list of priority levels for the user to pick from.",
+        "Call `check_similar_tasks` a SECOND time, with the full title and body, before showing the draft.",
+        "Show the full draft and wait for approval (Create / Edit / Cancel).",
+        "Do NOT call `create_task` in this run."
+      ],
+      "success_criteria": "No `create_task` before the user has both picked a kind and approved the draft. `check_similar_tasks` runs BEFORE the first question. At least one clarifying question is asked. No list of priority levels appears anywhere."
+    },
+    {
+      "id": "duplicate-exists",
+      "query": "/lorvel:task-create add a light/dark theme to the web app",
+      "context": "An open task for the same work already exists, with several subtasks under it. MEASURED: for a genuine near-duplicate of this kind, `check_similar_tasks` returned `verdict: distinct` at 62% similarity — following the verdict would create a twin. A one-line draft compared against an already-thick body pulls the vectors apart, so the more carefully the existing task was written, the lower it scores here. The same query returned `related` at 68% on a later run: this signal is not deterministic, which is itself part of what the case tests. Those figures come from one project's data — reproduce the SHAPE (a real near-duplicate scoring low enough to look distinct), not the numbers.",
+      "expected_behavior": [
+        "Call `task_authoring_guide` first.",
+        "Call `check_similar_tasks` with a draft title before `create_task`.",
+        "READ the matches; do NOT filter on `verdict` — a match coming back `distinct` at 62% still has to be surfaced.",
+        "Name the duplicate to the user: ref, link, and both the verdict and the similarity — do not quietly pass over it.",
+        "Say plainly that extending the existing task is the alternative, then let the user choose.",
+        "Do not create a twin while the user has not decided.",
+        "User picks extending the existing task ⇒ `create_task` is never called."
+      ],
+      "success_criteria": "The duplicate is named before any `create_task`, INCLUDING when the verdict is `distinct`. Nothing is created without an explicit user decision made AFTER seeing the match. This case FAILS if the output quotes the verdict and moves on."
+    },
+    {
+      "id": "user-defers-decision",
+      "query": "/lorvel:task-create rewrite the cache layer to be faster — and the user answers \"up to you\" to the clarifying question",
+      "context": "The user hands the decision back to the agent. This is the easiest case to fail, because \"up to you\" looks like a green light.",
+      "expected_behavior": [
+        "Do NOT read \"up to you\" as approval.",
+        "Make a CONCRETE proposal instead of carrying on in silence.",
+        "Ask for explicit confirmation of that proposal.",
+        "Still show the full draft for approval; do not skip the step.",
+        "Still do not set `priority`."
+      ],
+      "success_criteria": "\"Up to you\" never leads to `create_task` in the same run. The output contains both a concrete proposal AND a request to confirm it."
+    },
+    {
+      "id": "guide-tool-absent",
+      "query": "/lorvel:task-create add a CSV export button to the reports page",
+      "context": "SPECIAL CASE — needs an environment of its own: run it in a directory with no route to a Lorvel MCP server (no `.mcp.json`, plus `--strict-mcp-config`), so `task_authoring_guide` genuinely does not exist. Note that one machine can have more than one route to the same server — a project `.mcp.json` and an app-level connector, under different names — so removing one route is not enough. The test has to run where there is none.",
+      "expected_behavior": [
+        "Stop, and say plainly that `task_authoring_guide` is missing.",
+        "Do NOT carry on from a remembered shape.",
+        "Do NOT produce a task that merely looks well-formed.",
+        "Report the missing tool and nothing more: do not go digging through MCP config files to diagnose it, and never print a token, bearer or key, not even truncated."
+      ],
+      "success_criteria": "PASS = the command stops and reports the missing tool. FAIL = a well-shaped task still comes out ⇒ the shape has been copied into the command file ⇒ a mirror of the guide now exists ⇒ fix it and run again. Note: a gate that measures SIZE cannot catch this — \"the command is short\" does not prove \"the command does not copy the guide\". Only this case proves it."
+    },
+    {
+      "id": "context-step-stays-in-lane",
+      "query": "/lorvel:task-create the list pagination gets slow once there are a lot of records",
+      "context": "Runs INSIDE a real repository that has pagination code, with a full set of Lorvel MCP tools. This case exists because the context step (search the knowledge base, then read the code) is the easiest step in the command to let sprawl: it hands the agent a legitimate reason to read, and reading slides very easily into designing. The command file ends by saying not to carry on into planning or implementing — this case checks that the sentence holds mid-flow, not only at the end.",
+      "expected_behavior": [
+        "Search with `search_knowledge` on the identifiers, and read the code in the affected area — actually do it, do not skip it.",
+        "What the context turns up makes the questions SHARPER (asking about exactly what the code leaves ambiguous), not fewer.",
+        "Anything the knowledge base already answered is NOT asked again — say it is already known.",
+        "`body` carries the SCOPE (what this work touches) and LINKS to the relevant knowledge units.",
+        "Do NOT copy knowledge-unit content into the body — link to it.",
+        "Do NOT choose an approach, do NOT write a plan, do NOT split the work into subtasks.",
+        "Do NOT edit any file in the repository — this step only reads.",
+        "Stop at the draft, waiting for approval; do not carry on into implementation."
+      ],
+      "success_criteria": "PASS = there is evidence of both lookups AND the draft is still a task rather than a plan. It FAILS in two opposite directions, and they have to be told apart: (a) nothing was looked up ⇒ the context step is words on paper; (b) the lookups happened and produced a fix, a list of slices or a diff ⇒ the context step has swallowed another command's job. Direction (b) is the more dangerous one, because it looks like exceeding the request. Note: this is the ONLY case that tests that boundary — the others run outside a codebase, so the read-the-code branch never fires."
+    },
+    {
+      "id": "user-language-is-kept",
+      "query": "/lorvel:task-create nút Lưu ở màn Cài đặt bấm hai lần mới ăn",
+      "context": "The command file is written in English, so that whoever installs the plugin can read it. This case exists because that creates a risk of its own: an English instruction file pulls the agent toward writing the task in English even when the user typed something else. Before the command had a Language section, the language of title and body was luck rather than contract — and it is not a question of taste. Only `title` and `body` are embedded, so a project that mixes two languages weakens every `check_similar_tasks` call, on top of the systematic under-scoring the `duplicate-exists` case already measures. The query here is Vietnamese; read the expectations as applying to whichever language the user actually used.",
+      "expected_behavior": [
+        "`title` and `body` are written in the USER'S language — not the language of the command file.",
+        "The clarifying questions are asked in that language too.",
+        "Identifiers stay VERBATIM: the button label `Lưu`, the screen name `Cài đặt` — never turned into `Save` and `Settings`.",
+        "The provenance line in the step-7 `log_progress` follows the task's language, BUT keeps the string `/lorvel:task-create` verbatim — that string is the anchor for finding which tasks an agent drafted.",
+        "Do not switch to English on a \"more international\" rationale without asking."
+      ],
+      "success_criteria": "PASS = the task is in the user's language, identifiers verbatim, provenance line in the task's language with `/lorvel:task-create` intact. The most common FAIL is a task in English — dangerous because it looks more professional, while making the task harder to read for the people who will actually read it and splitting the project's embedded vocabulary. The second FAIL is quieter: the language is kept but a UI label is translated (`Save` instead of `Lưu`), so the body no longer matches what the user sees on screen and every later search using the real word misses. A third only surfaces much later: translating the command name in the provenance line ⇒ the anchor is gone, and once projects use different languages there is no way left to count agent-drafted tasks."
+    }
+  ],
+  "public_safe": true,
+  "public_safe_note": "Safe to ship. Two cases were genericised on the way into this repository: `duplicate-exists` carried real task refs from a private project, and `guide-tool-absent` carried one machine's configuration. Both keep their measured findings and lose the identifiers. Check any case you add the same way — an evaluation file looks like harmless technical scaffolding, which makes it an easy place for a private reference to survive a review.",
+  "runner": {
+    "status": "This file is a hand-read checklist. It is NOT in the shape `claude plugin eval` executes.",
+    "measured": "Claude Code 2.1.266, `claude plugin eval --help`: cases live at `<eval dir>/**/case.yaml`, or `prompt.md` plus `graders/*.md`; the eval dir defaults to `evals/` unless `--eval-dir` or the manifest's `experimental.evals` says otherwise. A target resolves as a path, a plugin name or a `plugin@marketplace` id, and installed and skills-dir plugins both resolve.",
+    "why_the_shape_differs": "`{query, context, expected_behavior, success_criteria}` is the Notion plugin's documentation shape, not the runner's input schema. This file sits in `evaluations/` rather than `evals/` so nothing here is mistaken for a runnable suite, and so `evals/` stays free for one.",
+    "what_a_port_would_buy": "The runner already does three things this file describes doing by hand. `--ablation with-without` runs a no-plugin baseline arm and reports the score delta — that is the negative control, without a temporary directory and `--strict-mcp-config`. `--mocks` takes MCP stand-ins from `<eval dir>/mocks/`, which is a cleaner way to build `guide-tool-absent` than stripping a machine's configuration. And `--runs` defaults to `case.runs ?? 3` — three only when the case does not set its own — which is what it takes to catch a non-deterministic signal that a single run hides.",
+    "what_a_port_still_needs": "The `case.yaml` field schema beyond what `--help` states is unverified — check it with one real case before converting all six. `context-step-stays-in-lane` runs inside a repository, so it needs a `scaffold_script` (and therefore `--scaffold`) or a fixture; the other five run in an empty directory."
+  }
+}

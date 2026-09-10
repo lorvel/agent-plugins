@@ -108,6 +108,32 @@ drop the line and the marketplace falls back to the default, which is off.
 
 `additionalMarketplaces` is accepted as an alias for `extraKnownMarketplaces`.
 
+## What the commands are checked against
+
+`plugins/lorvel/evaluations/task-create.json` holds the criteria
+`/lorvel:task-create` is judged on — one entry per case, each saying what the
+command has to do and what counts as failing. They were written before the
+command body, so they describe what it should do rather than what it happens to
+do.
+
+`/lorvel:task-work` has no such file yet, which is worth saying plainly rather
+than leaving to be inferred: the command that commits and pushes is the one
+without written criteria.
+
+They are read by hand. The shape is borrowed from another plugin's evaluations
+and is not the shape `claude plugin eval` executes, which is why they sit in
+`evaluations/` rather than `evals/`; the file itself says what porting them to
+the runner would buy and what it would still need.
+
+The case worth knowing about is `guide-tool-absent`: run the command somewhere
+with no route to a Lorvel MCP server, and it has to stop and say the tool is
+missing. Check that there is genuinely none — one machine can reach the same
+server through both a project `.mcp.json` and an app-level connector, under
+different names, and closing one of them leaves the test proving nothing. If a well-formed task comes out anyway, the shape of a task has been
+copied into the command file, and the runtime guide is no longer the only source
+of it. That is the one thing a reader cannot check by skimming — a short command
+file is not proof of an uncopied one.
+
 ## Local development
 
 The plugin directory can be symlinked into a project so edits take effect

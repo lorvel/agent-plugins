@@ -41,6 +41,13 @@ hardcodes a project's facts drifts away from them the moment they change.
 This repo ships no `version` field, so a plugin's version is its commit SHA:
 every push to `main` is a new version, and there is no release step.
 
+Nothing updates on its own. Claude Code turns auto-update on by default only
+for Anthropic's own marketplaces and for ones added through claude.ai; every
+other marketplace — this one included — starts with it **off**. So an installed
+plugin stays at the commit you installed it at until you say otherwise. That is
+not a setting anyone forgot to flip: it is what adding a marketplace someone
+else controls is supposed to mean.
+
 Refresh the marketplace, then the plugin:
 
 ```bash
@@ -52,6 +59,25 @@ claude plugin update lorvel
 step for you — `claude plugin install lorvel@lorvel-plugins` refreshes the
 marketplace before resolving the plugin, so a freshly pushed plugin installs
 without a manual marketplace update.
+
+### Turning auto-update on
+
+`/plugin` → **Marketplaces** → *Enable auto-update*. The toggle lives in that
+menu only; there is no CLI equivalent.
+
+It is worth being clear about what you are agreeing to, because the honest
+answer is not "convenience". Auto-update means Claude Code pulls whatever
+`main` happens to say at the start of a session and loads it with your
+permissions — plugins are trusted code, closer to something you install than
+something you read. What is in this repo today is Markdown that instructs
+Claude rather than a program that runs on your machine, but that is a fact
+about the current contents, not a promise about every future commit.
+
+So: turning it on is a reasonable choice for a team that already trusts this
+repo the way it trusts its own, and an unreasonable one as a default for
+strangers. Leaving it off costs two commands when you want a new version, and
+nothing else — the plugin does not degrade, warn, or nag if you never turn it
+on.
 
 ### Shared setup for a team
 
@@ -65,7 +91,8 @@ project's `.claude/settings.json`) so a teammate gets both on their next start:
       "source": {
         "source": "github",
         "repo": "lorvel/agent-plugins"
-      }
+      },
+      "autoUpdate": true
     }
   },
   "enabledPlugins": {
@@ -73,6 +100,11 @@ project's `.claude/settings.json`) so a teammate gets both on their next start:
   }
 }
 ```
+
+`autoUpdate` here is the same switch as the menu toggle above, with the same
+trade-off — decided once for everyone the settings file reaches. That reach is
+the reason to set it deliberately rather than because it came with the snippet:
+drop the line and the marketplace falls back to the default, which is off.
 
 `additionalMarketplaces` is accepted as an alias for `extraKnownMarketplaces`.
 

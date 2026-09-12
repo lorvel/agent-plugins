@@ -12,7 +12,7 @@ Cannot call this tool ⇒ **stop here and say plainly that it is missing.** Do n
 
 ⛔ Reporting a missing tool means **reporting that it is missing** — nothing more. Do not go digging through MCP config files to diagnose it on the user's behalf, and **never print a token, bearer or key** — not truncated, not "so you can compare it against yours". Users can open their own files; printing it pushes their secret into a chat window they may copy elsewhere.
 
-Then check the rest: are `check_similar_tasks`, `create_task`, `log_progress` present? A missing **write** tool, or a read-only credential ⇒ **say so now**. The five steps after this one are mostly spent waiting on a human; discovering at the last one that you cannot write means the user answered everything for nothing.
+Then check the rest: are `check_similar_tasks`, `create_task`, `log_progress` present? A missing **write** tool, or a read-only credential ⇒ **say so now**. Everything between here and the write at step 7 is lookups and the user's own answers; discovering at step 7 that you cannot write means they answered everything for nothing.
 
 `search_knowledge` is different: it is a **read** tool, used at step 4. Missing it **does not block** — note it and carry on.
 

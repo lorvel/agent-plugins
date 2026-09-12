@@ -6,7 +6,7 @@ Read this before step 6. The approval gate that ends step 6 is stated in `SKILL.
 
 Only now do you have a full `title` + `body`. **Call `check_similar_tasks` again with that full version** — the run at step 2 was on a thin draft and was the weakest measurement; this one is the real one. Handle new matches as in step 2.
 
-Then show the user **the whole text** of what is about to be written: `title`, `body`, the kind chosen, and every other field you intend to send.
+Then show the user **the whole text** of what is about to be written: `title`, `body`, the kind you settled on, and every field you intend to send.
 
 Ask with `AskUserQuestion`: **Create / Edit / Cancel**.
 
@@ -22,7 +22,7 @@ This step exists because the `body` is text **you** wrote, not the user — and 
 
 1. `create_task`, with the `token` from step 1.
 
-   ⚠️ The token lives about fifteen minutes, and everything from step 3 to here is lookups plus waiting on a human — **step 4 stretches that window further**. Expiring here is **ordinary, not a fault**. Rejected for an expired token ⇒ call `task_authoring_guide` for a fresh one and retry exactly once. Do not throw away the draft the user just approved.
+   ⚠️ The token lives about fifteen minutes, and everything from step 4 to here is lookups plus waiting on a human — **the reading at step 4 stretches that window further**. Expiring here is **ordinary, not a fault**. Rejected for an expired token ⇒ call `task_authoring_guide` for a fresh one and retry exactly once. Do not throw away the draft the user just approved.
 
 2. Then **one** `log_progress` on the task you created, opening with this line — **in the same language as the task**:
 
@@ -30,7 +30,7 @@ This step exists because the `body` is text **you** wrote, not the user — and 
 
    Translate the sentence; keep `/lorvel:task-create` **verbatim**. That name is the part that makes the receipt findable — anyone auditing which tasks an agent drafted greps for the command, not for a sentence whose wording they would have to guess in every language. The English above is the reference wording: translate its meaning, do not add to it.
 
-   The rest of the entry says briefly where the task came from: the user's own sentence, the kind chosen, any duplicate weighed at step 2 or 6, and **what step 4 turned up** — including when the answer is nothing.
+   The rest of the entry says briefly where the task came from: the user's own sentence, the kind you settled on, any duplicate weighed at step 2 or 6, and **what step 4 turned up** — including when the answer is nothing.
 
    This call fails ⇒ retry once, then **tell the user the task exists but has no provenance entry**. Do not go quiet: that entry is the only record that an agent drafted this.
 

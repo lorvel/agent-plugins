@@ -39,7 +39,7 @@ not the instructions; working from them is the guessing this command exists to p
 |---|---|---|
 | **1** Guide and tools | `task_authoring_guide`, keep the token, check the write tools are there. **GATE-1**. | `reference/intake.md` |
 | **2** Duplicates | A draft title into `check_similar_tasks`, then read the matches. **GATE-2**. | *(same file)* |
-| **3** Classify | Bug, change or spike — it decides what step 5 asks. | `reference/drafting.md` |
+| **3** Classify | Bug, change or spike — **you** settle it; step 5 states it, and asks only when there is nothing to go on. | `reference/drafting.md` |
 | **4** Context | Knowledge first, then the code. Read only; do not design the fix. | *(same file)* |
 | **5** Ask | What the user has not said — **do not skip this step**. | *(same file)* |
 | **6** Draft | `check_similar_tasks` again on the full text, then show it all. **GATE-3**. | `reference/writing.md` |

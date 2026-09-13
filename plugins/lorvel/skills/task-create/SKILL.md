@@ -25,9 +25,10 @@ If the tasks that come back at step 2 are consistently in a different language f
 |---|---|---|
 | **GATE-1** tools | step 1 | `task_authoring_guide` missing ⇒ **stop and say plainly that it is missing**. Report it and nothing more: do not go digging through MCP config, and never print a token, bearer or key. A missing **write** tool ⇒ say so at step 1, not at step 7. |
 | **GATE-2** duplicates | steps 2 and 6 | Any match that **could** be the same work ⇒ show it to the user, ask, and **create nothing** until they answer. |
-| **GATE-3** approval | step 6 | Show the **whole text** of the draft and wait for Create / Edit / Cancel. *"Up to you"* is **not** approval. |
 
-None of the three has an off switch: this command takes no flags, and "this one is small" is not a reason to skip one. Where the user has not said something, **ask** — no `AskUserQuestion` in the session means ask in text, not ask less.
+Neither has an off switch: this command takes no flags, and "this one is small" is not a reason to skip one. Where the user has not said something, **ask** — no `AskUserQuestion` in the session means ask in text, not ask less.
+
+**There is no approval gate, and adding one back is not a safe default.** Nothing duplicating at step 6 means the task gets written: the user can edit or drop it the moment they see the link, so a round asking permission to write charges every run to undo the occasional bad one. What the missing gate used to buy is paid at **step 5** instead — the last place a wrong sentence is caught before it reaches indexed text, which is why skipping it is the one shortcut here that nothing downstream makes up for.
 
 ## The steps
 
@@ -42,11 +43,12 @@ not the instructions; working from them is the guessing this command exists to p
 | **3** Classify | Bug, change or spike — **you** settle it; step 5 states it, and asks only when there is nothing to go on. | `reference/drafting.md` |
 | **4** Context | Knowledge first, then the code. Read only; do not design the fix. | *(same file)* |
 | **5** Ask | What the user has not said — **do not skip this step**. | *(same file)* |
-| **6** Draft | `check_similar_tasks` again on the full text, then show it all. **GATE-3**. | `reference/writing.md` |
+| **6** Re-check | The full `title` + `body` into `check_similar_tasks` once more; nothing new ⇒ on to step 7. **GATE-2**. | `reference/writing.md` |
 | **7** Write | `create_task`, one `log_progress` receipt, then report the link. | *(same file)* |
 
-The command can end at **step 1** or **step 2** — a guide tool that is not there, or a duplicate the
-user decides to extend instead. Neither is a failure, and neither needs the files for steps 3-7.
+The command can end early at **step 1** — no guide tool — or at **step 2** or **step 6**, wherever
+**GATE-2** turns up a duplicate the user decides to extend instead. None of those is a failure, and
+an ending at step 1 or 2 never needs the files for steps 3-7.
 
 Paths are relative to `${CLAUDE_SKILL_DIR}`. If a file is missing, say so and stop — do not
 reconstruct the step from memory.

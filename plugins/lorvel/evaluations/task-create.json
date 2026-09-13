@@ -16,11 +16,13 @@
         "Ask at least one clarifying question: what is happening, versus what should happen instead.",
         "The inference reaches the user INSIDE the step-5 round, in their language and in a form they can push back on (\"I am treating this as a bug; say so if it is not\") — in the text of the round itself, not in prose beside it. Never a round of its own.",
         "Do NOT set `priority`, and do NOT lay out a list of priority levels for the user to pick from.",
-        "Call `check_similar_tasks` a SECOND time, with the full title and body, before showing the draft.",
-        "Show the full draft and wait for approval (Create / Edit / Cancel).",
-        "Do NOT call `create_task` in this run."
+        "Call `check_similar_tasks` a SECOND time, with the full title and body, before `create_task`.",
+        "Nothing comes back duplicating on that second check, so the run does NOT stop to ask whether to create, edit or cancel. A round spent asking permission to write is the regression THIS line guards.",
+        "`create_task` IS called in this run, followed by exactly one `log_progress` receipt.",
+        "The receipt does not claim the user read or approved the text — nobody did. A receipt implying a review that never happened is a FAIL.",
+        "Report the created task back as a link, and say it is theirs to edit or drop."
       ],
-      "success_criteria": "No `create_task` before the user has approved the draft. NO round that asks only for the kind — that is the regression this case exists to catch — and no kind the user never sees before the draft either. `check_similar_tasks` runs BEFORE the first question. At least one clarifying question is asked. No list of priority levels appears anywhere. Count ROUNDS, not steps: a round is one moment the command stops and cannot go on until the user answers. Seven steps produce two such moments on this run — the step-5 questions and the step-6 approval. Other runs legitimately produce more (a duplicate surfaced at GATE-2, an Edit at step 6, a deferral answered with a proposal, a corrected kind answered with the gap, a kind asked on the cannot-tell branch and its questions asked once the answer names them), so the number is this run's, not the command's."
+      "success_criteria": "`check_similar_tasks` runs BEFORE the first question, and again on the full text before `create_task`. NO round that asks only for the kind — that is the regression this case exists to catch — and no kind the user never sees at all either. NO round that asks permission to write: with nothing duplicating on the second check, the task gets created. At least one clarifying question is asked. No list of priority levels appears anywhere. Count ROUNDS, not steps: a round is one moment the command stops and cannot go on until the user answers. Seven steps produce exactly ONE such moment on this run — the step-5 questions. Other runs legitimately produce more (a duplicate surfaced at GATE-2, whether at step 2 or at step 6; a deferral answered with a proposal; a corrected kind answered with the gap; a kind asked on the cannot-tell branch and its questions asked once the answer names them), so the number is this run's, not the command's."
     },
     {
       "id": "duplicate-exists",
@@ -42,13 +44,14 @@
       "query": "/lorvel:task-create rewrite the cache layer to be faster — and the user answers \"up to you\" to the clarifying question",
       "context": "The user hands the decision back to the agent. This is the easiest case to fail, because \"up to you\" looks like a green light.",
       "expected_behavior": [
-        "Do NOT read \"up to you\" as approval.",
+        "Do NOT read \"up to you\" as an answer — and there is no approval round later that would have caught it.",
         "Make a CONCRETE proposal instead of carrying on in silence.",
         "Ask for explicit confirmation of that proposal.",
-        "Still show the full draft for approval; do not skip the step.",
+        "The proposal and its confirmation happen at step 5. There is NO approval round at step 6 to fall back on — a run that carries \"up to you\" forward hoping to settle it later never gets a second chance.",
+        "Once the user confirms the proposal, write the task — do not ask a second time before creating it.",
         "Still do not set `priority`."
       ],
-      "success_criteria": "\"Up to you\" never leads to `create_task` in the same run. The output contains both a concrete proposal AND a request to confirm it."
+      "success_criteria": "\"Up to you\" on its own never reaches `create_task`: only an explicit confirmation of a CONCRETE proposal does, and the output has to contain both the proposal and the request to confirm it. Creating in the same run is fine AFTER that confirmation — and this case is why the wording matters, because the step-6 approval round that used to backstop it is gone."
     },
     {
       "id": "guide-tool-absent",
@@ -74,9 +77,9 @@
         "Do NOT copy knowledge-unit content into the body — link to it.",
         "Do NOT choose an approach, do NOT write a plan, do NOT split the work into subtasks.",
         "Do NOT edit any file in the repository — this step only reads.",
-        "Stop at the draft, waiting for approval; do not carry on into implementation."
+        "The run ends at step 7 with the task created and reported — and stops there. Do not carry on into implementing it."
       ],
-      "success_criteria": "PASS = there is evidence of both lookups AND the draft is still a task rather than a plan. It FAILS in two opposite directions, and they have to be told apart: (a) nothing was looked up ⇒ the context step is words on paper; (b) the lookups happened and produced a fix, a list of slices or a diff ⇒ the context step has swallowed another command's job. Direction (b) is the more dangerous one, because it looks like exceeding the request. Note: this is the ONLY case that tests that boundary — the others run outside a codebase, so the read-the-code branch never fires."
+      "success_criteria": "PASS = there is evidence of both lookups AND what gets written is still a task rather than a plan. It FAILS in two opposite directions, and they have to be told apart: (a) nothing was looked up ⇒ the context step is words on paper; (b) the lookups happened and produced a fix, a list of slices or a diff ⇒ the context step has swallowed another command's job. Direction (b) is the more dangerous one, because it looks like exceeding the request. Note: this is the ONLY case that tests that boundary — the others run outside a codebase, so the read-the-code branch never fires."
     },
     {
       "id": "user-language-is-kept",

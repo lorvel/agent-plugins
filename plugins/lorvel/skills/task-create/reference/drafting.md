@@ -1,6 +1,6 @@
 # Steps 3–5 — classify, gather context, ask
 
-Read this before step 3. This file is the detail for the three steps between the duplicate check and the draft.
+Read this before step 3. This file is the detail for the three steps between the duplicate check and the write.
 
 ## 3. Classify the work — settle it yourself, do not ask
 
@@ -10,9 +10,11 @@ Read the user's description and settle on one of three:
 - **Change** — deliberately add or alter behaviour
 - **Spike** — not enough is known yet, find out first
 
-This kind is **not a Lorvel field** and never becomes one. It lives in exactly three places: it is named aloud in step 5's round and picks which questions that round asks, it is shown again with the draft at step 6, and it is named once more in the step-7 provenance entry.
+This kind is **not a Lorvel field** and never becomes one. It lives in exactly two places: it is named aloud in step 5's round and picks which questions that round asks, and it is named again in the step-7 provenance entry.
 
-What it does not get is a **round**: one moment where the command stops and cannot go on until the user answers. Rounds are the unit the user actually pays in, and this command has few enough to count. A round spent here buys a kind they are shown twice anyway — inside step 5's round, then again in the step-6 draft — so the guess is cheap to make and cheap for them to overturn. Guess right, which is most of the time, and it costs nobody anything; guess wrong and it costs one short follow-up at step 5. That trade is why this step infers. It is not a licence to infer anything else — everything that goes *into* the task still follows step 5's rule of asking rather than assuming.
+What it does not get is a **round**: one moment where the command stops and cannot go on until the user answers. Rounds are the unit the user actually pays in, and this command has few enough to count. A round spent here buys a kind that step 5 already puts in front of them twice in the same breath — once as a sentence they can contradict, and again as the questions themselves, since *what happens, and what should happen instead* is what being read as a bug looks like from the outside. Guess right, which is most of the time, and it costs nobody anything; guess wrong and it costs one short follow-up there. That trade is why this step infers.
+
+Step 5 is also the last place it gets caught **before the task is written** — there is no approval round at step 6 to show the draft again — so state it there in a form that invites a correction, and do not read this licence to infer as covering anything else: everything that goes *into* the task still follows step 5's rule of asking rather than assuming.
 
 A kind the user named themselves — in their description, or in reply at step 5 — is taken as given. Do not push it back into the three above.
 
@@ -36,9 +38,9 @@ This step is for **understanding the work**, not for solving it.
 What you find is used in **two places**:
 
 1. **Step 5 asks sharper.** If the code shows two login paths, ask which one rather than something vague. And **do not ask what the knowledge base already answered** — say you already know it. Asking users about something their own team settled is bothering them with their own knowledge.
-2. **The `body` at step 6** carries real scope: what this touches, and which knowledge units constrain it. Write **links** to them; **do not copy their content into the body** — a copy is a second version, and it will drift.
+2. **The `body` you write** carries real scope: what this touches, and which knowledge units constrain it. Write **links** to them; **do not copy their content into the body** — a copy is a second version, and it will drift.
 
-Finding nothing must also **be said** at step 6: "searched knowledge and code, found no constraints" is not the same as silence — silence leaves the next reader unable to tell *looked and found nothing* from *never looked*.
+Finding nothing must also **be written into the `body`**: "searched knowledge and code, found no constraints" is not the same as silence — silence leaves the next reader unable to tell *looked and found nothing* from *never looked*. The body is where it has to go, not the chat: no draft is shown for review before this task is created, and chat scrolls away while the task does not.
 
 ## 5. Ask what is missing — DO NOT SKIP THIS STEP
 
@@ -56,6 +58,8 @@ Hold the user's sentence against what the guide asks for, **and against what ste
 Step 3 could not tell ⇒ the kind becomes **one of the questions in this round** rather than a statement to push back on. Ask it beside *what would have to be true for this to be finished* — which maps onto one question in each of the three sets above — and leave the rest of that kind's questions until the answer names it. **Once it does, ask them.** That is a second round and it is the right one: this branch exists for sentences too thin to guess from, and a draft built on a single answer is the thin task step 5 is here to prevent.
 
 **They push back and name a different kind** ⇒ size what is missing against the **new** kind's questions, not against how much they already typed. How much survives depends entirely on the direction: a bug read as a change keeps most of it, a bug read as a spike keeps almost none of it — *what happens* answers nothing that *what question needs answering* is asking. Put the genuine gap to them, say that is what you are doing, and accept that this is a second round. It is the bill a wrong guess pays, and it is why step 3 guesses only where there is something to guess from.
+
+**They hand the decision back** — *"up to you"*, *"whatever works"* — ⇒ **that is not an answer.** It is the easiest thing in this command to read as a green light, and the point where a task quietly becomes something the user never asked for. Put a specific proposal in front of them and ask them to confirm *that proposal*. Yes, it is a second round; it is the round that stops a decision they never made being written into indexed text nobody reviews.
 
 Batch them into one `AskUserQuestion` where you can, but **asking beats guessing**.
 

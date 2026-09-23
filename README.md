@@ -18,7 +18,7 @@ claude plugin install lorvel@lorvel-plugins
 
 | Command | What it does |
 |---|---|
-| `/lorvel:task-create` | Turns a one-line description into a Lorvel task, asking for what's missing and showing you the full draft before anything is written. |
+| `/lorvel:task-create` | Turns a one-line description into a Lorvel task, checking for duplicates and asking for what's missing before it writes. There is no draft to approve: edit or drop the task if it came out wrong. |
 | `/lorvel:task-work` | Works one task from reading it through to closing it: analyse, plan, implement, review, ship, audit the knowledge, close. Stop gates before planning and before committing. |
 
 `/lorvel:task-create` needs a connected Lorvel MCP server with write access. It

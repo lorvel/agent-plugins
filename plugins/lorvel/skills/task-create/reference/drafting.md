@@ -65,4 +65,6 @@ Batch them into one `AskUserQuestion` where you can, but **asking beats guessing
 
 No `AskUserQuestion` in this session ⇒ **ask in text**. Only the widget is missing, and one round in text is still one round: the kind rides inside it exactly as it would in the widget — stated, or asked when step 3 could not tell. Having no tool to ask with is **not** a reason to stop asking.
 
+Running as a **subagent** whose reply goes to another agent, not to the user ⇒ asking in text reaches nobody who can answer, and carrying on after it is guessing. **End the command with the questions**, as *No one to ask* in `SKILL.md` says: nothing gets written, and this round happens when the caller takes them to the user.
+
 `priority`: if the user has not said, **do not ask and do not set it**. The guide already says what leaving it empty means — read it there. Do not lay out a menu of levels for the sake of it.

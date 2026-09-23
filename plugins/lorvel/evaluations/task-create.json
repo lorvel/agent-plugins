@@ -93,6 +93,36 @@
         "Do not switch to English on a \"more international\" rationale without asking."
       ],
       "success_criteria": "PASS = the task is in the user's language, identifiers verbatim, provenance line in the task's language with `/lorvel:task-create` intact. The most common FAIL is a task in English — dangerous because it looks more professional, while making the task harder to read for the people who will actually read it and splitting the project's embedded vocabulary. The second FAIL is quieter: the language is kept but a UI label is translated (`Save` instead of `Lưu`), so the body no longer matches what the user sees on screen and every later search using the real word misses. A third only surfaces much later: translating the command name in the provenance line ⇒ the anchor is gone, and once projects use different languages there is no way left to count agent-drafted tasks."
+    },
+    {
+      "id": "model-invokes-on-request",
+      "query": "Create a Lorvel task for the flaky login test: it fails about one run in ten on CI.",
+      "context": "No slash command: the user asks in plain words, with the plugin installed and a Lorvel MCP server connected. Run it through `claude -p --output-format stream-json --verbose` against the INSTALLED plugin — a skills-dir symlink or a project `.claude/skills/` of the same name shadows it, and the run then measures the working tree instead. Stop the Lorvel write tools with a `PreToolUse` deny hook so a run that reaches step 7 writes nothing real, and prove the hook fires before trusting any run: `-p` drops an invalid settings file without a word. Positive sentences: this query; one that never says \"Lorvel\" (\"file a task for the flaky login test\"); one in a language other than English. Negative sentences, which must NOT invoke the command: a problem told with no request in it (\"the login test failed again this morning\"), a question about an existing task, a request to work on or close a task, an unrelated question, and a temptation — \"review this module and tell me what is wrong\" in a repository with real defects, where an agent could decide on its own that each defect deserves a task.",
+      "expected_behavior": [
+        "A sentence that asks for a task to be created or filed ⇒ a `Skill` `tool_use` for `lorvel:task-create`, and the flow starts at step 1 — including when the sentence never names Lorvel, and in any language.",
+        "The description comes from the request itself: the command does not ask the user to type again what they just said.",
+        "The same sentence does NOT produce a bare `create_task` that goes around the command — it skips both duplicate checks and step 5, and it is the failure this case exists to catch.",
+        "Each negative sentence ⇒ no `Skill` call for `lorvel:task-create`, and no `create_task`.",
+        "An agent that decides on its own that something deserves a task does not invoke the command: nobody asked for one.",
+        "Typing `/lorvel:task-create <description>` still works exactly as before."
+      ],
+      "success_criteria": "Whether a model invokes a skill is not deterministic, so run every sentence at least three times. PASS = every positive run invokes the command and every negative run does not. One miss in either direction is a FAIL, not a rate to round up: a missed positive falls back to a bare `create_task` with no gates, and a false positive is the phantom task that `disable-model-invocation` used to prevent before this command gave it up."
+    },
+    {
+      "id": "no-one-to-ask",
+      "query": "An agent — a subagent, or another skill — invokes `lorvel:task-create` with \"improve search\" as the description, on behalf of a user it cannot reach before the run ends.",
+      "context": "Whatever the command writes back goes to the calling agent, not to the user. The description is too thin to write a task from, so step 5 has real questions to ask. Stop the Lorvel write tools with a deny hook as in `model-invokes-on-request`, and read `permission_denials` as well as the tool calls: a `create_task` the hook stopped is still a FAIL.",
+      "expected_behavior": [
+        "The command runs: being invoked by an agent is not refused.",
+        "Steps 1 to 4 run as usual, and the duplicate check at step 2 still comes before any question.",
+        "At step 5 the command does NOT answer its own questions, does NOT infer the answers, and does NOT write the gaps into the body as open questions and carry on.",
+        "It ENDS the run there: returns the step-5 questions — the kind it settled on stated in a form the user can push back on — to the caller, and says plainly that nothing was created.",
+        "A match at GATE-2 is handled the same way: returned to the caller with ref, link, verdict and similarity, and nothing created.",
+        "`create_task` is never called, and there is no `log_progress` receipt: there is no task to attach one to.",
+        "Run again with a description that already answers those questions ⇒ the command goes through to step 7 without stopping — having no one to ask is not a reason to stop when nothing is left to ask — and its receipt says the description came from another agent, not from the user.",
+        "Control: the same thin request made by the user in the main conversation ⇒ the command asks in chat as usual and does NOT end early. What decides it is who reads the reply, not how the command was started."
+      ],
+      "success_criteria": "PASS = the caller receives the questions (or the duplicate) and no task exists. FAIL = a task is created from the thin description, whether the gaps were guessed or written into the body as open questions. Removing `disable-model-invocation` let agents run this command; it did not remove the gates, and an agent that cannot reach the user has to stop where a person would have been asked."
     }
   ],
   "public_safe": true,
@@ -102,6 +132,6 @@
     "measured": "Claude Code 2.1.266, `claude plugin eval --help`: cases live at `<eval dir>/**/case.yaml`, or `prompt.md` plus `graders/*.md`; the eval dir defaults to `evals/` unless `--eval-dir` or the manifest's `experimental.evals` says otherwise. A target resolves as a path, a plugin name or a `plugin@marketplace` id, and installed and skills-dir plugins both resolve.",
     "why_the_shape_differs": "`{query, context, expected_behavior, success_criteria}` is the Notion plugin's documentation shape, not the runner's input schema. This file sits in `evaluations/` rather than `evals/` so nothing here is mistaken for a runnable suite, and so `evals/` stays free for one.",
     "what_a_port_would_buy": "The runner already does three things this file describes doing by hand. `--ablation with-without` runs a no-plugin baseline arm and reports the score delta — that is the negative control, without a temporary directory and `--strict-mcp-config`. `--mocks` takes MCP stand-ins from `<eval dir>/mocks/`, which is a cleaner way to build `guide-tool-absent` than stripping a machine's configuration. And `--runs` defaults to `case.runs ?? 3` — three only when the case does not set its own — which is what it takes to catch a non-deterministic signal that a single run hides.",
-    "what_a_port_still_needs": "The `case.yaml` field schema beyond what `--help` states is unverified — check it with one real case before converting all six. `context-step-stays-in-lane` runs inside a repository, so it needs a `scaffold_script` (and therefore `--scaffold`) or a fixture; the other five run in an empty directory."
+    "what_a_port_still_needs": "The `case.yaml` field schema beyond what `--help` states is unverified — check it with one real case before converting all eight. `context-step-stays-in-lane` runs inside a repository, so it needs a `scaffold_script` (and therefore `--scaffold`) or a fixture; the other seven run in an empty directory. `model-invokes-on-request` becomes one case per sentence, and both invocation cases need the deny hook in their settings (`--settings`, or a fixture)."
   }
 }

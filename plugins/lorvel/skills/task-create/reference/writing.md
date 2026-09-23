@@ -6,7 +6,7 @@ Read this before step 6. The duplicate gate that can still end the command here 
 
 Only now do you have a full `title` + `body`. **Call `check_similar_tasks` again with that full version** — the run at step 2 was on a thin draft and was the weakest measurement; this one is the real one.
 
-A match that could be the same work is handled exactly as at step 2: show it with its ref, link, verdict and similarity, ask, and **create nothing until they answer**. That gate has not moved. It is now the only thing that can stop this command after step 2, so read the matches and not the verdict — the warning at step 2 about a well-developed task scoring low applies here too.
+A match that could be the same work is handled exactly as at step 2: show it with its ref, link, verdict and similarity, ask, and **create nothing until they answer**. That gate has not moved. Apart from *No one to ask* in `SKILL.md`, it is now the only thing that can end this command after step 2, so read the matches and not the verdict — the warning at step 2 about a well-developed task scoring low applies here too.
 
 Nothing duplicates ⇒ **go straight to step 7. Do not ask permission to write.** There is no create-or-edit-or-cancel round here and there is not meant to be. A task is not a deploy: `update_task` rewrites the title and body of one that already exists, and one nobody wants moves to a `dropped` status. A round spent here sells the user a decision they already hold, and charges it on every single run to undo the occasional bad one.
 
@@ -22,7 +22,11 @@ Nothing duplicates ⇒ **go straight to step 7. Do not ask permission to write.*
 
    > *This task was drafted by an agent via `/lorvel:task-create`, from the user's own description and their answers to its questions. The user did not read the final text before it was written.*
 
-   Translate the sentence; keep `/lorvel:task-create` **verbatim**. That name is the part that makes the receipt findable — anyone auditing which tasks an agent drafted greps for the command, not for a sentence whose wording they would have to guess in every language. The English above is the reference wording: translate its meaning, do not add to it.
+   The description came from **another agent** rather than from the user — you are running as a subagent, or another skill composed it ⇒ open with this line instead:
+
+   > *This task was drafted by an agent via `/lorvel:task-create`, from a description another agent passed on for the user. The user did not read the final text before it was written.*
+
+   Translate the sentence; keep `/lorvel:task-create` **verbatim**. That name is the part that makes the receipt findable — anyone auditing which tasks an agent drafted greps for the command, not for a sentence whose wording they would have to guess in every language. Either English line is reference wording: translate its meaning, do not add to it.
 
    **Do not soften the second half of it, and do not drop it as noise.** It is the one thing a later reader cannot work out for themselves: this `body` is indexed text that no human checked. Without it the receipt implies a review that never happened.
 

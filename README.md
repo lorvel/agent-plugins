@@ -25,6 +25,14 @@ claude plugin install lorvel@lorvel-plugins
 checks for that up front and stops if the tools aren't there, rather than
 writing a malformed task.
 
+You don't have to type `/lorvel:task-create`: ask Claude for a task in plain
+words and it will usually run the same command — type it when you want to be
+sure. Another agent working for you can run it too. It is written to run only
+when someone asks for a task, never because Claude decided something deserves
+one. If it needs to ask you something and the agent running it can't reach
+you, it hands the questions back to that agent and creates nothing.
+`/lorvel:task-work` still runs only when you type it.
+
 `/lorvel:task-work` assumes your setup already has a way to review a change and a
 way to commit one; it says when to reach for them and leaves the choice to you.
 It never commits or pushes on its own unless you pass `--auto`, and even then a

@@ -1,13 +1,13 @@
 ---
 name: task-create
 description: Step 1 — create a Lorvel task from a description
+when_to_use: Use when the user explicitly asks for a task or ticket to be created, filed or opened in Lorvel, in any language and whether or not they name Lorvel, or when you are a subagent handed that job on the user's behalf. Do NOT use it when the user only describes a problem, asks about an existing task, wants a task worked on, updated or closed, or means a to-do list for this session or an issue in another tracker — and never because you decided on your own that something deserves a task.
 argument-hint: [what needs doing]
-disable-model-invocation: true
 ---
 
 Create a task on Lorvel from this description: **$ARGUMENTS**
 
-No description given ⇒ ask the user before doing anything else.
+`$ARGUMENTS` empty ⇒ take the description from the request that brought you here; only when there is none, ask the user before doing anything else.
 
 This file carries **sequence only**. **The shape of a task is not in here** — it comes from `task_authoring_guide` at runtime. Do not write a task out of what you remember about Lorvel.
 
@@ -28,6 +28,8 @@ If the tasks that come back at step 2 are consistently in a different language f
 
 Neither has an off switch: this command takes no flags, and "this one is small" is not a reason to skip one. Where the user has not said something, **ask** — no `AskUserQuestion` in the session means ask in text, not ask less.
 
+**No one to ask.** What decides this is **who reads your reply**, not who started the command. Typed by the user, invoked by you from their plain-words request, or chained from another skill in this conversation ⇒ the user reads it: ask as usual. Running as a **subagent** — or as a skill that runs forked — whose final message goes to another agent ⇒ nobody who can answer will see a question. Then wherever this command would ask the user — no description, the working language, **GATE-2**, step 5 — **end the command there**: hand back the questions, or the matches with ref, link, verdict and similarity, say plainly that nothing was created, and stop. Having no way to reach the user is not permission to answer for them. Taking the questions to them is the caller's job, and the command then runs again with the answers in its description. A description that already answers everything ⇒ straight through to step 7.
+
 **There is no approval gate, and adding one back is not a safe default.** Nothing duplicating at step 6 means the task gets written: the user can edit or drop it the moment they see the link, so a round asking permission to write charges every run to undo the occasional bad one. What the missing gate used to buy is paid at **step 5** instead — the last place a wrong sentence is caught before it reaches indexed text, which is why skipping it is the one shortcut here that nothing downstream makes up for.
 
 ## The steps
@@ -47,8 +49,9 @@ not the instructions; working from them is the guessing this command exists to p
 | **7** Write | `create_task`, one `log_progress` receipt, then report the link. | *(same file)* |
 
 The command can end early at **step 1** — no guide tool — or at **step 2** or **step 6**, wherever
-**GATE-2** turns up a duplicate the user decides to extend instead. None of those is a failure, and
-an ending at step 1 or 2 never needs the files for steps 3-7.
+**GATE-2** turns up a duplicate the user decides to extend instead, or wherever **No one to ask**
+hands the questions or matches back to the caller. None of those is a failure, and an ending at
+step 1 or 2 never needs the files for steps 3-7.
 
 Paths are relative to `${CLAUDE_SKILL_DIR}`. If a file is missing, say so and stop — do not
 reconstruct the step from memory.

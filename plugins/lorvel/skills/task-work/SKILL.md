@@ -62,6 +62,8 @@ Two more rules hold whatever the flags say.
    loud, at the top is what stops a run from drifting into English three logs later.
 5. Work out which phase you are entering, and **say which one**.
 
+   `progress_log` may hold only the newest part of the log; `progress_log_total` counts all of it. Fewer entries than the total ⇒ read the rest with `list_progress_log` before picking the phase: any sign the table below turns on — a commit, a live check, how far the work got — may sit in an older entry. Fewer entries and no `list_progress_log` in this session ⇒ **stop and say it is missing**, as step 1 does, rather than pick a phase from a log you know is partial.
+
 Read this project's status vocabulary from `task_authoring_guide` before you read the table below. Status *categories* (`todo` / `in_progress` / `completed` / `dropped`) are the same everywhere; the *defs* over them are each project's own. A def name you remember from somewhere else is a project-fact you invented.
 
 | Sign | Enter at |

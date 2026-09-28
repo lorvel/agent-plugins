@@ -3,6 +3,29 @@ name: task-create
 description: Step 1 — create a Lorvel task from a description
 when_to_use: Use when the user explicitly asks for a task or ticket to be created, filed or opened in Lorvel, in any language and whether or not they name Lorvel, or when you are a subagent handed that job on the user's behalf. Do NOT use it when the user only describes a problem, asks about an existing task, wants a task worked on, updated or closed, or means a to-do list for this session or an issue in another tracker — and never because you decided on your own that something deserves a task.
 argument-hint: [what needs doing]
+metadata:
+  lorvel:
+    schema: 1
+    ids:
+      - {id: intake, kind: step, mode: extend, what: "Step 1 — get the guide, check the tools"}
+      - {id: GATE-1, kind: gate, in: [intake], mode: locked, what: "No guide tool ⇒ stop; a missing write tool ⇒ say so now"}
+      - {id: duplicates, kind: step, mode: extend, what: "Step 2 — check a draft title for duplicates"}
+      - {id: GATE-2, kind: gate, in: [duplicates, recheck], mode: locked, what: "A possible duplicate ⇒ show it, ask, create nothing until answered"}
+      - {id: classify, kind: step, mode: replace, what: "Step 3 — settle bug, change or spike"}
+      - {id: context, kind: step, mode: extend, what: "Step 4 — read the knowledge, then the code; change nothing"}
+      - {id: ask, kind: step, mode: locked, what: "Step 5 — ask what the user has not said"}
+      - {id: recheck, kind: step, mode: locked, what: "Step 6 — check the full title and body for duplicates"}
+      - {id: write, kind: step, mode: extend, what: "Step 7 — create the task, log the receipt, report the link"}
+      - id: no-one-to-ask
+        kind: rule
+        mode: locked
+        what: "Nobody who can answer reads the reply ⇒ end with the questions"
+        source: ["No one to ask.", "asking in text reaches nobody who can answer"]
+      - id: no-secrets
+        kind: rule
+        mode: locked
+        what: "Never print a token, bearer or key, not even truncated"
+        source: ["never print a token, bearer or key"]
 ---
 
 Create a task on Lorvel from this description: **$ARGUMENTS**

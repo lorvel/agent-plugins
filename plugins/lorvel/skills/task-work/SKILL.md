@@ -3,6 +3,50 @@ name: task-work
 description: Work one Lorvel task end to end, with stop gates
 argument-hint: <task-ref> [--plan] [--auto]
 disable-model-invocation: true
+metadata:
+  lorvel:
+    schema: 1
+    ids:
+      - {id: locate, kind: step, mode: extend, what: "Phase 0 — find the task and the phase to enter"}
+      - {id: analyse, kind: step, mode: extend, what: "Phase 1 — read the task, the knowledge and the code"}
+      - {id: STOP-1, kind: gate, in: [analyse], mode: locked, what: "At the end of phase 1 — ask what is still unclear; no flag turns it off"}
+      - {id: plan, kind: step, mode: extend, what: "Phase 2 — write the plan with a knowledge audit in it, move the task to `in_progress`"}
+      - {id: STOP-2, kind: gate, in: [plan], mode: locked, what: "Before the plan is saved to the task — wait for it to be approved; on with `--plan`"}
+      - {id: implement, kind: step, mode: extend, what: "Phase 3 — build it, log as you go, run the repo's gates"}
+      - {id: review, kind: step, mode: extend, what: "Phase 4 — a review pass, then every gate again"}
+      - {id: hand-over, kind: step, mode: extend, what: "Phase 5 — summarise, move to code done, not yet live"}
+      - {id: STOP-3, kind: gate, in: [hand-over], mode: locked, what: "At the end of phase 5 — wait for the diff to be approved; `--auto` drops the wait, not the machine gates"}
+      - {id: ship, kind: step, mode: extend, what: "Phase 6 — commit and push, verify it live, audit the knowledge, close, point to what is next"}
+      - id: missing-tools
+        kind: rule
+        mode: locked
+        what: "No Lorvel tools, or none to read the whole log ⇒ stop and say which are missing"
+        source: ["No Lorvel tools in this session", "Reporting missing tools means", "Fewer entries and no `list_progress_log` in this session"]
+      - id: machine-gates
+        kind: rule
+        mode: locked
+        what: "`--auto` never routes around a red gate, a review not run or a blocking secret scan"
+        source: ["switches off the HUMAN gate, not the MACHINE gates"]
+      - id: no-undo
+        kind: rule
+        mode: locked
+        what: "`--auto` never covers a change with no undo — a migration, a deploy pin, production schema or data"
+        source: ["does not apply to changes with no undo"]
+      - id: close-on-evidence
+        kind: rule
+        mode: locked
+        what: "A task closes on evidence, not on effort"
+        source: ["A task closes on evidence, not on effort."]
+      - id: knowledge-audit
+        kind: rule
+        mode: locked
+        what: "Audit the knowledge before closing; no exception"
+        source: ["A knowledge audit is mandatory before closing", "mandatory, never skipped"]
+      - id: no-secrets
+        kind: rule
+        mode: locked
+        what: "Never print a token, bearer or key, not even truncated"
+        source: ["never print a token, bearer or key"]
 ---
 
 Work this Lorvel task: **$ARGUMENTS**

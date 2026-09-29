@@ -2,6 +2,8 @@
 
 Read this before phase 3. STOP-3 and what `--auto` does to it are stated in `SKILL.md`; this file is the detail.
 
+**Sections from this run's customisation.** Look at the `<customisation>` block as each phase and gate in this file starts and ends, rather than trusting what you remember of the start of the run, and run its sections as its `Sections:` line says. No block in view ⇒ follow `customisation.md`, beside this file, first.
+
 ## Phase 3 — Implement
 
 - Follow the project's own conventions for structure, package manager and style. They are not in this file. Read the repo's instructions file, and `search_knowledge` for anything it does not cover — a convention you assume is a convention you are inventing.

@@ -46,14 +46,16 @@ hardcodes a project's facts drifts away from them the moment they change.
 
 ## Customising the commands
 
-A repository can change parts of `/lorvel:task-work` without forking the plugin, with
-a file in `.lorvel/` in the folder the session was opened in:
+A repository can change parts of both commands without forking the plugin, with files in
+`.lorvel/` in the folder the session was opened in:
 
-- `.lorvel/task-work.md` — shared: commit it, and the whole team gets it.
-- `.lorvel/task-work.local.md` — personal: keep it out of git. Its settings win over
-  the shared file's.
+- `.lorvel/task-work.md` and `.lorvel/task-create.md` — shared: commit them, and the whole
+  team gets them.
+- `.lorvel/task-work.local.md` and `.lorvel/task-create.local.md` — personal: keep them out
+  of git. Their settings win over the shared file's, and where both files have a section
+  at the same place, the shared one runs first.
 
-This version reads the frontmatter and nothing else:
+Settings go in the frontmatter, and sections in the body:
 
 ```markdown
 ---
@@ -62,7 +64,17 @@ review: code-review xhigh --fix
 defaults:
   plan: true
 ---
+
+## after: implement
+
+Run the linter with its fix option before the review.
+
+## before: ship
+
+Follow the release checklist in `docs/RELEASE.md`.
 ```
+
+The settings are `/lorvel:task-work`'s; `/lorvel:task-create` has none yet.
 
 - `review` — the skill phase 4 calls to review the change, with its arguments, instead
   of the command picking whatever review tooling it finds. A skill that is not there,
@@ -74,9 +86,39 @@ defaults:
   run on behalf of the person typing the command. `--no-plan` turns STOP-2 off for one
   run; typed together with `--plan`, STOP-2 stays on.
 
+A section is a `## before: <ID>`, `## after: <ID>`, `## replace: <ID>` or `## skip: <ID>`
+heading and the text Claude follows there. The IDs are each command's steps, gates and
+rules, declared with what a customisation may do at each in the `metadata` of its
+`SKILL.md`; `plugins/lorvel/ids.md` says what the fields and modes mean.
+
+- `before:` and `after:` add a step next to any step or gate. A gate keeps its place when
+  it is switched off, and GATE-2 of `/lorvel:task-create`, which sits in two steps, runs
+  its sections in both. An `after:` on a command's last step runs before its closing
+  report, which stays last.
+- `replace:` puts your text in place of a step's own, where the step allows it — in this
+  version, only `classify` of `/lorvel:task-create`. An empty `replace:` counts as a `skip:`.
+- `skip:` drops a step marked optional; its text, if any, says why. No step is optional in
+  this version, so every `skip:` is refused for now.
+- A personal file can only add steps: `replace:` and `skip:` are for the shared file.
+- A section can ask the user something, even where the command would carry straight on.
+  When `/lorvel:task-create` runs for another agent, that question ends the command, as
+  its own questions do.
+- A section can point Claude to another file in the repository, but never into `.lorvel/`:
+  the loader refuses a section that names it, and Claude never opens a file there whatever
+  a section says.
+- `/lorvel:task-create` reads its files after its first step's checks, so a section
+  before `intake` or `GATE-1` cannot apply.
+- The sections of one file take at most 1,536 bytes once printed: they reach Claude at the
+  start of every run, before anything else it reads there. For more, point to a file.
+
+Whatever a section says, it cannot skip or replace a step other than through its own
+`skip:` or `replace:` heading, and it cannot make a locked step or rule do less — the stop
+gates, the duplicate checks and step 5 of `/lorvel:task-create`, never printing a key, and
+the others the `metadata` marks `locked`. Claude does not do that part and says so.
+Claude reads a section's text quoted, under the line that names its place.
+
 The first reply of every run lists what applied and which file it came from, and what
-was refused and why. The body of a file — anything after the frontmatter — is not
-applied yet.
+was refused and why.
 
 **What the loader refuses.** A script that ships with the plugin,
 `plugins/lorvel/scripts/lorvel-load`, reads these files before Claude sees anything,
@@ -84,7 +126,14 @@ and Claude is told never to open them itself. A file that contains invisible Uni
 characters (zero-width, bidirectional and tag characters, among others) or anything
 that looks like a token or a key is refused as a whole: only a line naming the file
 reaches the conversation, never its text. So is a file that is a symbolic link, is
-larger than 64 KiB, or has frontmatter the loader does not understand. Only `.lorvel/`
+larger than 64 KiB, or has frontmatter the loader does not understand. A section is
+refused on its own when it names no ID of the command, when the ID or the file's layer
+does not allow what it does, when it has no text, when it names `.lorvel/`, when it looks
+like it carries a key, or when a code fence in it is never closed. All the sections of a file
+are refused when its body holds text a rendered view of the file does not show — HTML or
+anything shaped like a tag, an image, a link's title, a link definition such as `[//]: # (…)`,
+or words after a code fence's language — so that what applies is what a reviewer reading the
+file rendered by a code host sees. Only `.lorvel/`
 in the session folder is read — never a parent folder's or a subfolder's — and only
 files named exactly `task-work.md`, `task-work.local.md`, `task-create.md` and
 `task-create.local.md`. The script needs `sh`, `awk`, `od` and `find`.
@@ -96,7 +145,7 @@ allowed tools — stops `/lorvel:task-work` from starting at all, whether or not
 repository has a `.lorvel/`. On Windows it needs Git Bash.
 
 `/lorvel:task-create` reads `.lorvel/task-create.md` and `.lorvel/task-create.local.md`
-the same way, but nothing in them applies yet. Claude checks for the two names first,
+with the same loader, but not before it starts. Claude checks for the two names first,
 and runs the loader through Bash only when one of them exists, so in the default
 permission mode it asks before running it; refuse, and the command carries on without
 customisation.
@@ -142,7 +191,7 @@ answer is not "convenience". Auto-update means Claude Code pulls whatever
 `main` happens to say at the start of a session and loads it with your
 permissions — plugins are trusted code, closer to something you install than
 something you read. What is in this repo today is mostly Markdown that instructs
-Claude, plus a small loader — two shell scripts and two awk programs — that runs on
+Claude, plus a small loader — two shell scripts and six awk programs — that runs on
 your machine to read a project's `.lorvel/` files. `/lorvel:task-work` runs it at
 every start without asking, because the plugin pre-approves it. That is a fact about
 the current contents, not a promise about every future commit.

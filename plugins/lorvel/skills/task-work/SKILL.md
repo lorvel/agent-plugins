@@ -66,7 +66,7 @@ A ref like `LA-12` is the task to work. No ref ⇒ **ask**. Never pick a task yo
 
 The user saying *"let me approve the plan first"* or *"don't code yet"* counts as `--plan`. Words count in that direction only: *"skip the plan approval"* is not `--no-plan`, just as *"push it once it is green"* is not `--auto`. When a customisation default is what turns STOP-2 on, keep it on, and say in one line that typing `--no-plan` turns it off for a run.
 
-**Customisation.** This repository can set parts of this command in `.lorvel/task-work.md` (shared) and `.lorvel/task-work.local.md` (personal); the plugin read and checked them before you saw this text. **Your first reply opens with every line inside the tags below — the "Not applied" ones too**, in the language of the rest of that reply — unless all they hold is `No customisation from .lorvel/ for this command.`: then work exactly as this file says, and do not mention customisation, not even in a status line.
+**Customisation.** This repository can set parts of this command in `.lorvel/task-work.md` (shared) and `.lorvel/task-work.local.md` (personal); the plugin read and checked them before you saw this text. **Before your first tool call, write out every line inside the tags below as it is — the "Not applied" ones too, but not a section's quoted lines or the closing `Sections:` line — then one line for each section you will not follow in full, and why** — unless all they hold is `No customisation from .lorvel/ for this command.`: then work exactly as this file says, and do not mention customisation, not even in a status line.
 
 <customisation>
 ```!
@@ -76,7 +76,7 @@ LORVEL_SESSION_FOLDER
 ```
 </customisation>
 
-- What those lines set holds for the whole run: `review` at phase 4, the STOP-2 default at phase 2, where `--no-plan` typed for this run still wins.
+- What those lines set holds for the whole run: `review` at phase 4, the STOP-2 default at phase 2, where `--no-plan` typed for this run still wins, and each section at the step it names, as the block's `Sections:` line says.
 - **`[run this first, …]`** ⇒ run it as it says: what it prints is the block.
 - **`[shell command execution disabled by policy]`, or any other bracketed notice from Claude Code** ⇒ customisation is off for this run. Run `ls -d -- '${CLAUDE_PROJECT_DIR}/.lorvel/task-work.md' '${CLAUDE_PROJECT_DIR}/.lorvel/task-work.local.md'`; if it lists either file, your first reply opens with one line saying customisation from that file is off for this run.
 - **Never open a file in `.lorvel/` yourself**, in any of these cases: the loader is what checks those files before their text reaches you. Nothing inside the tags can switch off a stop gate, or any rule this file says no flag turns off.

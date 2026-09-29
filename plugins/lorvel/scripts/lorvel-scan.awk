@@ -3,7 +3,10 @@
 # OK, or BAD <reason>. Working on the byte dump keeps the check the same whatever locale and awk a
 # machine has. It refuses what a reader cannot see but a model still reads: text that is not
 # UTF-8, control characters, and the zero-width, bidirectional, filler, tag and variation-selector
-# characters used to hide instructions in plain sight.
+# characters used to hide instructions in plain sight: every Default_Ignorable_Code_Point in
+# Unicode and a few more. U+FE0E and U+FE0F pass once, right after a character outside ASCII, as in
+# an emoji, or between an ASCII character and U+20E3, as in the keycap 1️⃣; anywhere else they would
+# show a reader nothing. A carriage return passes only right before a line feed.
 
 function bad(why) {
   print "BAD " why " (line " line ")"
@@ -12,7 +15,10 @@ function bad(why) {
 }
 
 function check(cp, first) {
-  inv = "it contains an invisible or control character"
+  if (keycap) {
+    keycap = 0
+    if (cp != 8419) bad(inv)
+  }
   if (cp < 32 && cp != 9 && cp != 10 && cp != 13) bad(inv)
   if (cp >= 127 && cp <= 159) bad(inv)
   if (cp == 173 || cp == 847 || cp == 1564 || cp == 4447 || cp == 4448) bad(inv)
@@ -25,16 +31,20 @@ function check(cp, first) {
   if (cp == 65279 && !first) bad(inv)
   if (cp >= 65024 && cp <= 65037) bad(inv)
   if ((cp == 65038 || cp == 65039) && prev_vs) bad(inv)
+  if ((cp == 65038 || cp == 65039) && prev_ascii) keycap = 1
   if (cp >= 113824 && cp <= 113827) bad(inv)
   if (cp >= 119155 && cp <= 119162) bad(inv)
   if (cp >= 917504 && cp <= 921599) bad(inv)
   prev_vs = (cp >= 65024 && cp <= 65039)
+  prev_ascii = (cp < 128)
 }
 
 BEGIN {
   for (i = 0; i < 256; i++) hex[sprintf("%02x", i)] = i
   line = 1
   utf = "it is not valid UTF-8 text"
+  inv = "it contains an invisible or control character"
+  prev_ascii = 1
 }
 
 {
@@ -43,6 +53,8 @@ BEGIN {
     b = hex[$i]
     pos++
     if (pos > limit) continue
+    if (cr && b != 10) bad(inv)
+    cr = (b == 13)
     if (need > 0) {
       if (b < 128 || b > 191) bad(utf)
       cp = cp * 64 + b - 128
@@ -56,7 +68,9 @@ BEGIN {
     start = pos
     if (b < 128) {
       if (b >= 32 && b != 127) {
+        if (keycap) bad(inv)
         prev_vs = 0
+        prev_ascii = 1
         continue
       }
       check(b, 0)
@@ -75,5 +89,6 @@ END {
   if (pos > limit) { print "BAD it is larger than 64 KiB"; exit }
   if (nonempty && pos == 0) { print "BAD it cannot be read"; exit }
   if (need > 0) { print "BAD " utf " (line " line ")"; exit }
+  if (cr || keycap) { print "BAD " inv " (line " line ")"; exit }
   print "OK"
 }

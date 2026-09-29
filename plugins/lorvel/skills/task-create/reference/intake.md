@@ -2,6 +2,8 @@
 
 Read this before step 1. The gates that can end the command at these steps are stated in `SKILL.md`; this file is the detail.
 
+**Sections from this run's customisation.** Look at the loader's output from step 1 as each step and gate in this file starts and ends, and run its sections as its `Sections:` line says. That output no longer in view ⇒ run the loader again, as `SKILL.md` says; refused ⇒ customisation is off for the rest of this run. A section for step 1 or GATE-1 runs as soon as that output is in.
+
 ## 1. Get the guide, and check the tools before spending the user's time
 
 Call `task_authoring_guide`. Keep the `token` **and read the whole guide it returns**.

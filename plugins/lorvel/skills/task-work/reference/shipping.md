@@ -2,6 +2,8 @@
 
 Read this before phase 6, including when phase 0 sends you straight here. The knowledge audit in step 4 is mandatory and has no exception.
 
+**Sections from this run's customisation.** Look at the `<customisation>` block as each phase and gate in this file starts and ends, rather than trusting what you remember of the start of the run, and run its sections as its `Sections:` line says. No block in view ⇒ follow `customisation.md`, beside this file, first. Here, an `after:` section for this phase runs once step 6 is done: steps 7 and 8 stay last.
+
 ## Phase 6 — Ship, verify, and close
 
 Enter here once the user approved at STOP-3, **or** with `--auto` and the gates green.

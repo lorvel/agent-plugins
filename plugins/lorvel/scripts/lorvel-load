@@ -47,17 +47,18 @@ if [ ! -L "$dir" ]; then
 fi
 
 here=$(cd "$(dirname "$0")" 2>/dev/null && pwd) || off "the loader could not find its own folder, so nothing in .lorvel/ was applied."
-out=$(sh "$here/lorvel-load.sh" "$skill" "$folder" 2>/dev/null) || off "the loader failed, so nothing in .lorvel/ was applied."
-[ -n "$out" ] || off "the loader failed, so nothing in .lorvel/ was applied."
+failed() {
+  off "the loader failed, so nothing in .lorvel/ was applied."
+}
+out=$(sh "$here/lorvel-load.sh" "$skill" "$folder" 2>/dev/null) || failed
+[ -n "$out" ] || failed
 
-# The last filter: only the line shapes the checking half prints, in printable ASCII plus the dash
-# it uses. Anything else means that half is broken, and nothing of it reaches the model.
-printf '%s\n' "$out" | LC_ALL=C awk '
-  { line = $0; gsub(/\342\200\224/, "", line) }
-  line ~ /[^ -~]/ { bad = 1 }
-  $0 !~ /^- (review: |STOP-2 on by default |Not applied: |Nothing in )/ { bad = 1 }
-  END { exit bad }
-' || off "the loader failed, so nothing in .lorvel/ was applied."
+# The last filter, which has to answer OK: only the line shapes the checking half prints, a
+# section's text only quoted under its own line, the "Sections:" line last, and no line that looks
+# like a token or a key. Then the whole output is scanned for invisible characters, as a file is.
+# Anything else means that half is broken, and nothing of it reaches the model.
+[ "$(printf '%s\n' "$out" | LC_ALL=C awk -f "$here/lorvel-token.awk" -f "$here/lorvel-check.awk" 2>/dev/null)" = OK ] || failed
+[ "$(printf '%s\n' "$out" | od -An -v -tx1 -N 65537 | LC_ALL=C awk -v limit=65536 -v nonempty=1 -f "$here/lorvel-scan.awk" 2>/dev/null)" = OK ] || failed
 
 printf '%s\n%s\n' "$header" "$out"
 exit 0

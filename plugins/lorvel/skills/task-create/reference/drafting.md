@@ -2,6 +2,8 @@
 
 Read this before step 3. This file is the detail for the three steps between the duplicate check and the write.
 
+**Sections from this run's customisation.** Look at the loader's output from step 1 as each step and gate in this file starts and ends, and run its sections as its `Sections:` line says. That output no longer in view ⇒ run the loader again, as `SKILL.md` says; refused ⇒ customisation is off for the rest of this run.
+
 ## 3. Classify the work — settle it yourself, do not ask
 
 Read the user's description and settle on one of three:
@@ -17,6 +19,8 @@ What it does not get is a **round**: one moment where the command stops and cann
 Step 5 is also the last place it gets caught **before the task is written** — there is no approval round at step 6 to show the draft again — so state it there in a form that invites a correction, and do not read this licence to infer as covering anything else: everything that goes *into* the task still follows step 5's rule of asking rather than assuming.
 
 A kind the user named themselves — in their description, or in reply at step 5 — is taken as given. Do not push it back into the three above.
+
+**A `replace: classify` section in this run's customisation replaces this step.** Settle the kind as that section says, in place of the three above, and carry it on as this step would: step 5 still names it in a form the user can push back on, and works out the questions that kind needs, as it does for a kind the user named.
 
 **Genuinely cannot tell?** Then the sentence is too thin to infer from, and inferring anyway is the wrong move: make the kind **one of the questions in step 5's round**. A sentence that thin is often a spike, so do not quietly fall back on the bug questions while you wait — ask the kind beside *what would have to be true for this to be finished*, the one question worth asking of all three, and leave that kind's own questions until the answer names it. The kind question itself rides in a round that is happening regardless; what it can cost on top is one short round at step 5, once the answer says which questions were the right ones to ask.
 
@@ -48,7 +52,7 @@ This is the step most often skipped, and the one that separates a task worth hav
 
 Hold the user's sentence against what the guide asks for, **and against what step 4 turned up**. Where the user has not said, **ask** — do not infer it and write it in. Where knowledge already answered, **do not ask** — say you know it, and only raise it if it contradicts what the user said.
 
-**Open the round by naming the kind you settled on at step 3, in a form they can push back on** — *"I am treating this as a bug; say so if it is not"*. Put it in the text of the round itself, not in prose beside it that they may never read. Translate the sentence like everything else you put in front of them; it is reference wording, not a string to paste. Then ask that kind's questions:
+**The loader printed lines at step 1 ⇒ the round opens with them**, as `SKILL.md` says, before anything else. **Then name the kind you settled on at step 3, in a form they can push back on** — *"I am treating this as a bug; say so if it is not"*. Put it in the text of the round itself, not in prose beside it that they may never read. Translate the sentence like everything else you put in front of them; it is reference wording, not a string to paste. Then ask that kind's questions:
 
 - **Bug** — what happens, what should happen instead, where it shows
 - **Change** — what is different once it is done, and how anyone knows it is done

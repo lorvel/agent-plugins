@@ -2,6 +2,8 @@
 
 Read this before phase 1. The stop gates that end these phases are stated in `SKILL.md`; this file is the detail.
 
+**Sections from this run's customisation.** Look at the `<customisation>` block as each phase and gate in this file starts and ends, rather than trusting what you remember of the start of the run, and run its sections as its `Sections:` line says. No block in view ⇒ follow `customisation.md`, beside this file, first.
+
 ## Phase 1 — Read and analyse
 
 - Read the task's `body` and `plan` properly.

@@ -4,6 +4,8 @@
 # Run from anywhere: ruby tests/ids.test.rb
 
 require "yaml"
+require "open3"
+require "tempfile"
 Encoding.default_external = Encoding::UTF_8
 
 PLUGIN = File.expand_path("../plugins/lorvel", __dir__)
@@ -21,10 +23,40 @@ HEREDOC = "<<'LORVEL_SESSION_FOLDER'"
 # model to say nothing about it.
 NONE = File.read(File.join(PLUGIN, "scripts", "lorvel-load"))[/^none='([^']*)'$/, 1]
 
+POINTER = {
+  "task-work" => "**Sections from this run's customisation.** Look at the `<customisation>` block as each phase and gate in this file starts and ends, rather than trusting what you remember of the start of the run, and run its sections as its `Sections:` line says. No block in view ⇒ follow `customisation.md`, beside this file, first.",
+  "task-create" => "**Sections from this run's customisation.** Look at the loader's output from step 1 as each step and gate in this file starts and ends, and run its sections as its `Sections:` line says. That output no longer in view ⇒ run the loader again, as `SKILL.md` says; refused ⇒ customisation is off for the rest of this run.",
+}
+
 $failures = 0
 def fail(msg)
   $failures += 1
   puts "FAIL #{msg}"
+end
+
+# The ID list as scripts/lorvel-ids.awk reads it: [id, kind, mode, step label, gate steps, sources].
+def awk_ids(skill_md)
+  dump = Tempfile.new(["dump", ".awk"])
+  dump.write(<<~'AWK')
+    BEGIN {
+      if (!load_ids(skillmd)) { print "LOAD FAILED"; exit 1 }
+      for (i = 1; i <= ids_n; i++) {
+        line = ids_id[i] "\t" ids_kind[i] "\t" ids_mode[i] "\t" (ids_kind[i] == "step" ? ids_label[i] : "") "\t" ids_in[i]
+        for (k = 1; k <= ids_src_n[i]; k++) line = line "\t" ids_src[i, k]
+        print line
+      }
+    }
+  AWK
+  dump.close
+  out, status = Open3.capture2({"LC_ALL" => "C"}, "awk", "-v", "skillmd=#{skill_md}",
+                               "-f", File.join(PLUGIN, "scripts", "lorvel-ids.awk"), "-f", dump.path)
+  return [:failed, out] unless status.success?
+  out.force_encoding("UTF-8").lines.map do |l|
+    f = l.chomp.split("\t", -1)
+    f[0, 5] + [f[5..] || []]
+  end
+ensure
+  dump&.unlink
 end
 
 %w[task-work task-create].each do |skill|
@@ -116,7 +148,43 @@ end
     fail("task-create: runs a command before the model reads it") unless bang_blocks.zero? && inline_bangs.zero?
   end
   fail("#{skill}: body has $ARGUMENTS inside the loader command") if body =~ /lorvel-load[^\n]*\$ARGUMENTS/
+  # Sections apply where they are anchored, so every step file sends the model back to them, in the
+  # same words: the rules themselves are in the loader's Sections: line, stated once.
+  fail("#{skill}: SKILL.md does not point to the Sections: line") unless body.include?("`Sections:` line")
+  Dir[File.join(PLUGIN, "skills", skill, "reference", "*.md")].sort.each do |f|
+    next if File.basename(f) == "customisation.md"
+    fail("#{skill}: reference/#{File.basename(f)} lacks the sections pointer") unless File.read(f).include?(POINTER[skill])
+  end
+  # The loader prints labels and quoted source phrases on its Sections line, which its last filter
+  # takes only in printable ASCII (and its dash).
+  rows.each do |r|
+    printed = r["kind"] == "rule" ? Array(r["source"]) : (r["kind"] == "step" ? [r["what"].split(" — ").first] : [])
+    printed.each { |t| fail("#{skill}: #{r["id"]} prints #{t.inspect}, which is not printable ASCII") unless t.delete("—").match?(/\A[ -~]*\z/) }
+  end
+
+  # The loader reads the same list with awk (scripts/lorvel-ids.awk), in the two shapes the skill
+  # writes it in; it has to see exactly what a YAML parser sees.
+  want = rows.map do |r|
+    label = r["kind"] == "step" ? r["what"].split(" — ").first : ""
+    [r["id"], r["kind"], r["mode"], label, Array(r["in"]).join(" "), Array(r["source"])]
+  end
+  got = awk_ids(File.join(PLUGIN, "skills", skill, "SKILL.md"))
+  fail("#{skill}: lorvel-ids.awk reads #{got.inspect}\n  YAML reads #{want.inspect}") unless got == want
   puts "#{skill}: #{rows.size} IDs, #{steps.size} steps, #{gate_ids.size} gates, #{locked.size} locked"
+end
+
+# POSIX awk refuses a function parameter named like a function, and gawk --posix enforces it; the
+# loader runs these files together.
+PROGRAMS = [%w[lorvel-token.awk lorvel-ids.awk lorvel-read.awk], %w[lorvel-ids.awk lorvel-sections.awk], %w[lorvel-token.awk lorvel-check.awk]]
+PROGRAMS.each do |files|
+  srcs = files.map { |f| File.read(File.join(PLUGIN, "scripts", f)) }
+  funcs = srcs.flat_map { |t| t.scan(/^function\s+(\w+)\s*\(/).flatten }
+  srcs.each_with_index do |t, i|
+    t.scan(/^function\s+(\w+)\s*\(([^)]*)\)/).each do |name, params|
+      clash = params.split(",").map(&:strip).reject(&:empty?) & funcs
+      fail("#{files[i]}: #{name}() has a parameter named like a function: #{clash}") unless clash.empty?
+    end
+  end
 end
 
 ids_md = File.read(File.join(PLUGIN, "ids.md"))
@@ -131,6 +199,11 @@ if system("git", "-C", repo, "rev-parse", "--git-dir", out: File::NULL, err: Fil
   mode = `git -C "#{repo}" ls-files -s plugins/lorvel/scripts/lorvel-load`[/\A\d+/]
   fail("git records scripts/lorvel-load as #{mode.inspect}, not 100755") unless mode == "100755"
 end
+# The README states the cap on a file's sections; it has to be the one the loader applies.
+seccap = File.read(File.join(PLUGIN, "scripts", "lorvel-load.sh"))[/^seccap=(\d+)$/, 1]
+readme = File.read(File.join(repo, "README.md"))
+fail("lorvel-load.sh has no seccap= line") unless seccap
+fail("README does not give the cap on sections, #{seccap} bytes") unless seccap && readme.include?("#{seccap.to_i.to_s.reverse.scan(/\d{1,3}/).join(",").reverse} bytes")
 attrs = File.exist?(File.join(repo, ".gitattributes")) ? File.read(File.join(repo, ".gitattributes")) : ""
 ["/plugins/lorvel/scripts/* text eol=lf", "/plugins/lorvel/**/*.md text eol=lf"].each do |line|
   fail(".gitattributes lacks #{line}") unless attrs.include?(line)

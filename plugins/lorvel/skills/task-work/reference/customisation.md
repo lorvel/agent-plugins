@@ -1,6 +1,6 @@
 # When the customisation block is gone
 
-Read this only when the `<customisation>` block near the top of `SKILL.md` is no longer in view — a session that was resumed and then compacted loses it. The plugin's loader has to run again before phase 2 decides STOP-2 or phase 4 picks the review tool.
+Read this only when the `<customisation>` block near the top of `SKILL.md` is no longer in view — a session that was resumed and then compacted loses it. The plugin's loader has to run again before phase 2 decides STOP-2, phase 4 picks the review tool, or any phase runs the sections a customisation adds.
 
 1. Check the two names with Bash, where `<folder>` is the folder this session was opened in:
 
@@ -13,7 +13,7 @@ Read this only when the `<customisation>` block near the top of `SKILL.md` is no
        <folder>
        LORVEL_SESSION_FOLDER
 
-   What it prints stands in for the block, and applies as `SKILL.md` says.
+   What it prints stands in for the block, sections included, and applies as `SKILL.md` says.
 3. The call is refused or fails ⇒ customisation is off for the rest of this run. Say so in one line. STOP-2 then follows only the flags typed for this run, and phase 4 picks its review tooling as it would with none set.
 
 Never open a file in `.lorvel/` yourself — not with Read, cat or anything else. The loader is what checks those files before their text reaches you.

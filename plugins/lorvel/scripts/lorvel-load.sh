@@ -3,8 +3,10 @@
 # The checking half of lorvel-load, which is the only thing that calls it and which prints the
 # header above these lines. Reads the two layers of one command's customisation,
 # .lorvel/<command>.md (shared) and .lorvel/<command>.local.md (personal), and prints one line per
-# thing to say, each starting with "- ". Nothing from a file reaches the output unless it passed
-# every check: a file refused as a whole leaves one line naming it and the reason, never its text.
+# thing to say, each starting with "- " — a section's text quoted under its own line — and, when a
+# section applies, the "Sections:" line last. Nothing from a file reaches the output unless it
+# passed every check: a file refused as a whole leaves one line naming it and the reason, never its
+# text.
 # May exit non-zero on something unexpected; lorvel-load turns that into "customisation is off".
 
 set -u
@@ -16,6 +18,13 @@ skill=$1
 dir=$2/.lorvel
 case $0 in */*) here=${0%/*} ;; *) here=. ;; esac
 limit=65536
+# The most bytes the sections of one file may take once printed. With everything else the loader
+# can print, it keeps the command's rendered text, block included, under the ~20,000 characters
+# Claude Code attaches again after compaction.
+seccap=1536
+# Through the environment, not awk -v, which would read a backslash in the path as an escape.
+LORVEL_SKILLMD=$here/../skills/$skill/SKILL.md
+export LORVEL_SKILLMD
 nl='
 '
 
@@ -32,7 +41,7 @@ if [ ! -r "$dir" ] || [ ! -x "$dir" ]; then
   exit 0
 fi
 
-review='' review_from='' review_over='' plan_from='' notes=''
+review='' review_from='' review_over='' plan_from='' notes='' secs='' recs=''
 
 for name in "$skill.md" "$skill.local.md"; do
   listed "$dir" "$name" || continue
@@ -62,7 +71,8 @@ for name in "$skill.md" "$skill.local.md"; do
     continue
   fi
 
-  records=$(awk -v skill="$skill" -v shown="$shown" -v limit="$limit" -f "$here/lorvel-read.awk" "$f") || exit 1
+  records=$(awk -v skill="$skill" -v shown="$shown" -v limit="$limit" -v seccap="$seccap" \
+    -f "$here/lorvel-token.awk" -f "$here/lorvel-ids.awk" -f "$here/lorvel-read.awk" "$f") || exit 1
   [ -n "$records" ] || exit 1
   old_ifs=$IFS
   IFS=$nl
@@ -74,7 +84,9 @@ for name in "$skill.md" "$skill.local.md"; do
         review_from=$shown
         ;;
       PLAN) plan_from=${plan_from:+$plan_from and }$shown ;;
-      'LINE '*) notes="$notes${r#LINE }$nl" ;;
+      'LINE '*) notes="$notes${r#LINE }$nl" recs="${recs}NOTE ${r#LINE }$nl" ;;
+      'SEC '*) secs=1 recs="$recs$r$nl" ;;
+      'TXT '*) recs="$recs$r$nl" ;;
       *) exit 1 ;;
     esac
   done
@@ -91,4 +103,10 @@ fi
 if [ -n "$plan_from" ]; then
   printf '%s\n' "- STOP-2 on by default — defaults.plan: true in $plan_from; typing --no-plan turns it off for one run"
 fi
-printf '%s' "$notes"
+if [ -z "$secs" ]; then
+  printf '%s' "$notes"
+  exit 0
+fi
+# The sections, then the notes, then the "Sections:" line.
+out=$(printf '%s' "$recs" | awk -v skill="$skill" -f "$here/lorvel-ids.awk" -f "$here/lorvel-sections.awk") || exit 1
+printf '%s\n' "$out"

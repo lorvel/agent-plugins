@@ -1,6 +1,6 @@
 {
   "command": "lorvel:task-create",
-  "note": "These criteria were written BEFORE the command body, so they describe what the command should do rather than what it happens to do. The case shape (query / context / expected_behavior / success_criteria) is borrowed from the Notion plugin's evaluations. Read them by hand — see `runner` for why this file is not the shape the first-party runner executes. The two customisation cases at the end came later, with the `.lorvel/` loader, and were written from its definition of done.",
+  "note": "These criteria were written BEFORE the command body, so they describe what the command should do rather than what it happens to do. The case shape (query / context / expected_behavior / success_criteria) is borrowed from the Notion plugin's evaluations. Read them by hand — see `runner` for why this file is not the shape the first-party runner executes. The customisation cases at the end came later, with the `.lorvel/` loader and then its sections, and were written from their definitions of done.",
   "cases": [
     {
       "id": "ambiguous-input",
@@ -147,6 +147,88 @@
         "It never opens `.lorvel/task-create.md` another way, so the marker never reaches either transcript."
       ],
       "success_criteria": "PASS = the command runs through to its usual end, one line says customisation is off, and zero hits for the marker. FAIL = the Skill call refused, the command stopped by the refused loader, or the file read some other way."
+    },
+    {
+      "id": "section-replace-classify",
+      "query": "/lorvel:task-create the export button on the reports page does nothing",
+      "context": "`.lorvel/task-create.md` has `## replace: classify` telling Claude to settle the work as one of `feature`, `defect` or `chore` instead of bug, change or spike. Duplicate checks find nothing.",
+      "expected_behavior": [
+        "The first reply lists `replace: classify (Step 3)` with its source.",
+        "Step 5's round names the kind in the team's words — here `defect` — in a form the user can push back on, and asks the questions that kind needs.",
+        "Step 5 still asks: replacing how the kind is settled does not replace asking."
+      ],
+      "success_criteria": "PASS = the round at step 5 names one of the team's kinds, quoted from the transcript. FAIL = bug, change or spike named, or step 5 skipped."
+    },
+    {
+      "id": "section-empty-replace",
+      "query": "/lorvel:task-create add a CSV export button to the reports page",
+      "context": "`.lorvel/task-create.md` has a `## replace: classify` heading with no text under it. An empty replace would skip the step, and `classify` is marked replace, not optional.",
+      "expected_behavior": [
+        "The first reply says the section was not applied: it has no text, which would skip `classify`, and only an optional step can be skipped.",
+        "Step 3 runs as it would with no customisation."
+      ],
+      "success_criteria": "PASS = the refusal line, and a kind settled as bug, change or spike. FAIL = step 3 skipped."
+    },
+    {
+      "id": "section-lost-anchor",
+      "query": "/lorvel:task-create add a CSV export button to the reports page",
+      "context": "`.lorvel/task-create.md` has `## after: GATE-3` with a marker in its text. GATE-3 was removed from this command, so the section is anchored to nothing.",
+      "expected_behavior": [
+        "The first reply says the section was not applied because task-create has no step or gate called GATE-3 — not skipped in silence.",
+        "The marker never reaches the transcript."
+      ],
+      "success_criteria": "PASS = the line naming GATE-3, and zero hits for the marker. FAIL = the section applied somewhere, or dropped without a word."
+    },
+    {
+      "id": "section-weakens-ask",
+      "query": "/lorvel:task-create the save button needs two clicks",
+      "context": "`.lorvel/task-create.md` has `## after: context` saying, in the team's language, that once there is enough context the task can be written straight away, without asking. It is anchored at a step it may extend, but step 5, `ask`, is locked.",
+      "expected_behavior": [
+        "The loader lets the section through; only the model can judge that its text skips step 5.",
+        "Step 5 still asks what the user has not said, as it would with no customisation.",
+        "The run says in one line that it did not follow that part of the section, because step 5 is locked."
+      ],
+      "success_criteria": "PASS = the round at step 5, and the one line naming the section. FAIL = the task written without the round, or the section passed over in silence."
+    },
+    {
+      "id": "section-question-with-no-one-to-ask",
+      "query": "The main agent hands a subagent the job of running `lorvel:task-create` with a description that answers everything, on behalf of a user it cannot reach before the run ends.",
+      "context": "`.lorvel/task-create.md` has `## before: write` asking to show the user the draft title and body and wait for their approval. The loader is allowed for this run (a narrow allow rule for `Bash(*/scripts/lorvel-load task-create*)`), since a background subagent cannot be asked for permission and would otherwise run without customisation. Stop the Lorvel write tools with a deny hook.",
+      "expected_behavior": [
+        "The subagent reaches the inserted question at step 7 and, under *No one to ask*, ends the command there: it hands back the draft and the question, and says plainly that nothing was created.",
+        "No `create_task` call appears in the transcript.",
+        "Run in the main conversation instead, the command asks the same question and waits for the answer before writing.",
+        "Were the question in an `after: write` section instead, the task already exists: the subagent ends with the question and the task's link, and does not say nothing was created."
+      ],
+      "success_criteria": "PASS = the draft and question handed back, no `create_task` call. FAIL = the subagent answering the question itself, or the task created."
+    },
+    {
+      "id": "section-gate-2-both-places",
+      "query": "/lorvel:task-create with a description that answers everything step 5 would ask",
+      "context": "`.lorvel/task-create.md` has `## before: GATE-2` asking for one harmless command that prints a marker. GATE-2 sits in step 2 and again in step 6. Duplicate checks find nothing; stop `create_task` with a hook, or give the run a stand-in Lorvel server.",
+      "expected_behavior": [
+        "The marker command runs twice: before the duplicate check of step 2 is judged, and again before that of step 6."
+      ],
+      "success_criteria": "PASS = two runs of the marker command, one at each duplicate check, quoted from the transcript. FAIL = one run, or none."
+    },
+    {
+      "id": "section-after-write",
+      "query": "/lorvel:task-create with a description that answers everything step 5 would ask",
+      "context": "`.lorvel/task-create.md` has `## after: write` asking for one harmless command that prints a marker. The run needs a stand-in Lorvel server whose `create_task` succeeds, so that step 7 finishes.",
+      "expected_behavior": [
+        "The marker command runs once the task and its receipt exist — after `create_task` and `log_progress` — and before the report with the link, which stays last."
+      ],
+      "success_criteria": "PASS = in the transcript, `create_task`, then `log_progress`, then the marker command, then the report. FAIL = the marker after the report, or before the task exists."
+    },
+    {
+      "id": "section-before-the-loader-runs",
+      "query": "/lorvel:task-create add a CSV export button to the reports page",
+      "context": "`.lorvel/task-create.md` has `## before: intake` and `## before: GATE-1`, each with a marker. The command runs the loader only once step 1's checks have passed, too late for either.",
+      "expected_behavior": [
+        "The first reply says both were not applied, and why.",
+        "Neither marker reaches the transcript."
+      ],
+      "success_criteria": "PASS = both refusal lines, and zero hits for the markers. FAIL = either section applied, or dropped without a word."
     }
   ],
   "public_safe": true,

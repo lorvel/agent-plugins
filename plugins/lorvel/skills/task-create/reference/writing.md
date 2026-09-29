@@ -2,6 +2,8 @@
 
 Read this before step 6. The duplicate gate that can still end the command here is stated in `SKILL.md`; this file is the detail.
 
+**Sections from this run's customisation.** Look at the loader's output from step 1 as each step and gate in this file starts and ends, and run its sections as its `Sections:` line says. That output no longer in view ⇒ run the loader again, as `SKILL.md` says; refused ⇒ customisation is off for the rest of this run.
+
 ## 6. Check duplicates again — DO NOT SKIP THIS STEP
 
 Only now do you have a full `title` + `body`. **Call `check_similar_tasks` again with that full version** — the run at step 2 was on a thin draft and was the weakest measurement; this one is the real one.
@@ -34,6 +36,8 @@ Nothing duplicates ⇒ **go straight to step 7. Do not ask permission to write.*
 
    This call fails ⇒ retry once, then **tell the user the task exists but has no provenance entry**. Do not go quiet: that entry is the only record that an agent drafted this.
 
-3. Report back to the user as `[<ref>](<url>)`, taking `url` from the response — do not build the URL yourself.
+3. An `after:` section for step 7 runs here, once the task and its receipt exist: the report below stays last.
+
+4. Report back to the user as `[<ref>](<url>)`, taking `url` from the response — do not build the URL yourself. The loader printed lines at step 1 that no round has shown yet ⇒ the report opens with them, as `SKILL.md` says.
 
    They are meeting this text for the first time here, so the report is where a wrong guess still gets caught cheaply. Name in one line what you settled on and what you leaned on: the kind, and anything step 4 turned up that shaped the scope. Then say plainly that it is theirs to change — they can edit the title and body, or drop the task outright — so a sentence you got wrong costs a correction rather than a rewrite.

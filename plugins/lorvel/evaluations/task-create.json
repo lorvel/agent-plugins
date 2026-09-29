@@ -1,13 +1,13 @@
 {
   "command": "lorvel:task-create",
-  "note": "These criteria were written BEFORE the command body, so they describe what the command should do rather than what it happens to do. The case shape (query / context / expected_behavior / success_criteria) is borrowed from the Notion plugin's evaluations. Read them by hand — see `runner` for why this file is not the shape the first-party runner executes.",
+  "note": "These criteria were written BEFORE the command body, so they describe what the command should do rather than what it happens to do. The case shape (query / context / expected_behavior / success_criteria) is borrowed from the Notion plugin's evaluations. Read them by hand — see `runner` for why this file is not the shape the first-party runner executes. The two customisation cases at the end came later, with the `.lorvel/` loader, and were written from its definition of done.",
   "cases": [
     {
       "id": "ambiguous-input",
       "query": "/lorvel:task-create fix the login thing",
       "context": "Lorvel MCP connected. The user's sentence says neither what is wrong nor what fixing it would mean. No priority mentioned.",
       "expected_behavior": [
-        "Call `task_authoring_guide` before anything else, keep the token, AND check that the write tools are present.",
+        "Call `task_authoring_guide` before anything else (the `.lorvel/` name check may go in the same message), keep the token, AND check that the write tools are present.",
         "Use no remembered rule about fields, status or priority — only what the guide just returned.",
         "Call `check_similar_tasks` with a draft title IMMEDIATELY, before spending any of the user's turns on questions.",
         "Once nothing duplicates: settle the kind (bug / change / spike) with NO round of its own. THIS query supports an inference — \"fix\" points at a bug — so inferring is what the case expects; falling back to asking the kind is a FAIL here, and that branch is for a sentence that names no direction at all.",
@@ -29,7 +29,7 @@
       "query": "/lorvel:task-create add a light/dark theme to the web app",
       "context": "An open task for the same work already exists, with several subtasks under it. MEASURED: for a genuine near-duplicate of this kind, `check_similar_tasks` returned `verdict: distinct` at 62% similarity — following the verdict would create a twin. A one-line draft compared against an already-thick body pulls the vectors apart, so the more carefully the existing task was written, the lower it scores here. The same query returned `related` at 68% on a later run: this signal is not deterministic, which is itself part of what the case tests. Those figures come from one project's data — reproduce the SHAPE (a real near-duplicate scoring low enough to look distinct), not the numbers.",
       "expected_behavior": [
-        "Call `task_authoring_guide` first.",
+        "Call `task_authoring_guide` first (the `.lorvel/` name check may go in the same message).",
         "Call `check_similar_tasks` with a draft title before `create_task`.",
         "READ the matches; do NOT filter on `verdict` — a match coming back `distinct` at 62% still has to be surfaced.",
         "Name the duplicate to the user: ref, link, and both the verdict and the similarity — do not quietly pass over it.",
@@ -123,6 +123,30 @@
         "Control: the same thin request made by the user in the main conversation ⇒ the command asks in chat as usual and does NOT end early. What decides it is who reads the reply, not how the command was started."
       ],
       "success_criteria": "PASS = the caller receives the questions (or the duplicate) and no task exists. FAIL = a task is created from the thin description, whether the gaps were guessed or written into the body as open questions. Removing `disable-model-invocation` let agents run this command; it did not remove the gates, and an agent that cannot reach the user has to stop where a person would have been asked."
+    },
+    {
+      "id": "customisation-absent-no-loader-call",
+      "query": "/lorvel:task-create add a CSV export button to the reports page",
+      "context": "The session folder has no `.lorvel/task-create.md` and no `.lorvel/task-create.local.md` — with no `.lorvel/` at all, and again with a `.lorvel/` that holds only another command's files. Default permission mode.",
+      "expected_behavior": [
+        "Alongside step 1's guide call, the command checks the two file names with `ls -d` on the exact paths, which needs no permission, and never lists the folder: other file names in it are repository text the loader has not checked.",
+        "It does NOT run the loader script: the transcript has no Bash call to `scripts/lorvel-load`.",
+        "No permission prompt appears that the command without customisation did not raise, and customisation is never mentioned.",
+        "The rest of the run is the command as before."
+      ],
+      "success_criteria": "PASS = no call to the loader and no extra permission request in the transcript. FAIL = the loader called on every run: in the default mode that is a permission prompt for everyone, whether they use `.lorvel/` or not."
+    },
+    {
+      "id": "customisation-subagent-default-mode",
+      "query": "The main agent hands a background subagent the job of running `lorvel:task-create` with a thin description, on behalf of a user it cannot reach before the run ends.",
+      "context": "Default permission mode. `.lorvel/task-create.md` exists and holds a marker string that appears nowhere else. Stop the Lorvel write tools with a deny hook, as in `model-invokes-on-request`. Grep the transcript of the session that ran the command for the marker — the subagent's transcript included — never the transcript of the session doing the grepping.",
+      "expected_behavior": [
+        "The subagent's Skill call is not refused: the command declares no `allowed-tools`, so a model's call to it needs no Skill permission.",
+        "The command checks the two names, sees the file, and once GATE-1 has passed tries to run the loader through Bash; a background subagent cannot be asked for permission, so that call is refused.",
+        "It then says in one line that customisation is off for this run, and carries on — here, to *No one to ask*: the questions go back to the caller and nothing is created.",
+        "It never opens `.lorvel/task-create.md` another way, so the marker never reaches either transcript."
+      ],
+      "success_criteria": "PASS = the command runs through to its usual end, one line says customisation is off, and zero hits for the marker. FAIL = the Skill call refused, the command stopped by the refused loader, or the file read some other way."
     }
   ],
   "public_safe": true,
@@ -132,6 +156,6 @@
     "measured": "Claude Code 2.1.266, `claude plugin eval --help`: cases live at `<eval dir>/**/case.yaml`, or `prompt.md` plus `graders/*.md`; the eval dir defaults to `evals/` unless `--eval-dir` or the manifest's `experimental.evals` says otherwise. A target resolves as a path, a plugin name or a `plugin@marketplace` id, and installed and skills-dir plugins both resolve.",
     "why_the_shape_differs": "`{query, context, expected_behavior, success_criteria}` is the Notion plugin's documentation shape, not the runner's input schema. This file sits in `evaluations/` rather than `evals/` so nothing here is mistaken for a runnable suite, and so `evals/` stays free for one.",
     "what_a_port_would_buy": "The runner already does three things this file describes doing by hand. `--ablation with-without` runs a no-plugin baseline arm and reports the score delta — that is the negative control, without a temporary directory and `--strict-mcp-config`. `--mocks` takes MCP stand-ins from `<eval dir>/mocks/`, which is a cleaner way to build `guide-tool-absent` than stripping a machine's configuration. And `--runs` defaults to `case.runs ?? 3` — three only when the case does not set its own — which is what it takes to catch a non-deterministic signal that a single run hides.",
-    "what_a_port_still_needs": "The `case.yaml` field schema beyond what `--help` states is unverified — check it with one real case before converting all eight. `context-step-stays-in-lane` runs inside a repository, so it needs a `scaffold_script` (and therefore `--scaffold`) or a fixture; the other seven run in an empty directory. `model-invokes-on-request` becomes one case per sentence, and both invocation cases need the deny hook in their settings (`--settings`, or a fixture)."
+    "what_a_port_still_needs": "The `case.yaml` field schema beyond what `--help` states is unverified — check it with one real case before converting all ten. `context-step-stays-in-lane` runs inside a repository, so it needs a `scaffold_script` (and therefore `--scaffold`) or a fixture, and the two customisation cases need a `.lorvel/` folder the same way; the other seven run in an empty directory. `model-invokes-on-request` becomes one case per sentence, and the three invocation cases need the deny hook in their settings (`--settings`, or a fixture)."
   }
 }

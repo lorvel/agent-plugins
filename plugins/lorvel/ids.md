@@ -2,7 +2,7 @@
 
 `task-create` and `task-work` each declare their steps, gates and locked rules in the frontmatter of their `SKILL.md`, under `metadata.lorvel.ids`: steps and gates in the order they run, then the rules. That list is the contract a customisation of a command anchors to, and this file is the one place its fields and modes are defined.
 
-Nothing reads it yet: neither command applies a customisation in this version. It costs a run nothing either — Claude Code keeps `metadata` on the loaded skill but shows the model none of it, not when a command runs and not in the list of skills it can call (checked on Claude Code 2.1.283).
+Nothing reads it yet. This version applies only a customisation's frontmatter — the review tool and the STOP-2 default, read by `scripts/lorvel-load` — and nothing anchored to an ID. The list costs a run nothing either — Claude Code keeps `metadata` on the loaded skill but shows the model none of it, not when a command runs and not in the list of skills it can call (checked on Claude Code 2.1.283).
 
 An ID stays the same when steps are renumbered. The numbered steps inside a `task-work` phase have no ID of their own.
 

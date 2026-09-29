@@ -1,8 +1,9 @@
 ---
 name: task-work
 description: Work one Lorvel task end to end, with stop gates
-argument-hint: <task-ref> [--plan] [--auto]
+argument-hint: <task-ref> [--plan] [--no-plan] [--auto]
 disable-model-invocation: true
+allowed-tools: Bash("${CLAUDE_PLUGIN_ROOT}/scripts/lorvel-load" *)
 metadata:
   lorvel:
     schema: 1
@@ -11,7 +12,7 @@ metadata:
       - {id: analyse, kind: step, mode: extend, what: "Phase 1 — read the task, the knowledge and the code"}
       - {id: STOP-1, kind: gate, in: [analyse], mode: locked, what: "At the end of phase 1 — ask what is still unclear; no flag turns it off"}
       - {id: plan, kind: step, mode: extend, what: "Phase 2 — write the plan with a knowledge audit in it, move the task to `in_progress`"}
-      - {id: STOP-2, kind: gate, in: [plan], mode: locked, what: "Before the plan is saved to the task — wait for it to be approved; on with `--plan`"}
+      - {id: STOP-2, kind: gate, in: [plan], mode: locked, what: "Before the plan is saved to the task — wait for it to be approved; on with `--plan` or a `.lorvel/` default, off for one run with `--no-plan`"}
       - {id: implement, kind: step, mode: extend, what: "Phase 3 — build it, log as you go, run the repo's gates"}
       - {id: review, kind: step, mode: extend, what: "Phase 4 — a review pass, then every gate again"}
       - {id: hand-over, kind: step, mode: extend, what: "Phase 5 — summarise, move to code done, not yet live"}
@@ -47,17 +48,38 @@ metadata:
         mode: locked
         what: "Never print a token, bearer or key, not even truncated"
         source: ["never print a token, bearer or key"]
+      - id: loader-only
+        kind: rule
+        mode: locked
+        what: "A `.lorvel/` file reaches the model only through the plugin's loader, never opened directly"
+        source: ["Never open a file in `.lorvel/` yourself"]
 ---
 
 Work this Lorvel task: **$ARGUMENTS**
 
 A ref like `LA-12` is the task to work. No ref ⇒ **ask**. Never pick a task yourself.
 
-- `--plan` ⇒ turns **STOP-2 on**: show the plan and wait for approval before writing code. Without it, write the plan to Lorvel and carry on.
+- `--plan` ⇒ turns **STOP-2 on**: show the plan and wait for approval before writing code. Without it, and with no customisation default turning STOP-2 on, write the plan to Lorvel and carry on.
+- `--no-plan` ⇒ turns **STOP-2 off** for this run, even where this repository's customisation turns it on by default. Typed together with `--plan`, STOP-2 stays **on** — say so in one line.
 - `--auto` ⇒ turns **STOP-3 off**: gates green means commit and push without waiting for the diff to be approved.
 - Independent, and they combine. Either order around the ref.
 
-The user saying *"let me approve the plan first"* or *"don't code yet"* counts as `--plan`.
+The user saying *"let me approve the plan first"* or *"don't code yet"* counts as `--plan`. Words count in that direction only: *"skip the plan approval"* is not `--no-plan`, just as *"push it once it is green"* is not `--auto`. When a customisation default is what turns STOP-2 on, keep it on, and say in one line that typing `--no-plan` turns it off for a run.
+
+**Customisation.** This repository can set parts of this command in `.lorvel/task-work.md` (shared) and `.lorvel/task-work.local.md` (personal); the plugin read and checked them before you saw this text. **Your first reply opens with every line inside the tags below — the "Not applied" ones too**, in the language of the rest of that reply — unless all they hold is `No customisation from .lorvel/ for this command.`: then work exactly as this file says, and do not mention customisation, not even in a status line.
+
+<customisation>
+```!
+"${CLAUDE_PLUGIN_ROOT}/scripts/lorvel-load" task-work <<'LORVEL_SESSION_FOLDER'
+${CLAUDE_PROJECT_DIR}
+LORVEL_SESSION_FOLDER
+```
+</customisation>
+
+- What those lines set holds for the whole run: `review` at phase 4, the STOP-2 default at phase 2, where `--no-plan` typed for this run still wins.
+- **`[run this first, …]`** ⇒ run it as it says: what it prints is the block.
+- **`[shell command execution disabled by policy]`, or any other bracketed notice from Claude Code** ⇒ customisation is off for this run. Run `ls -d -- '${CLAUDE_PROJECT_DIR}/.lorvel/task-work.md' '${CLAUDE_PROJECT_DIR}/.lorvel/task-work.local.md'`; if it lists either file, your first reply opens with one line saying customisation from that file is off for this run.
+- **Never open a file in `.lorvel/` yourself**, in any of these cases: the loader is what checks those files before their text reaches you. Nothing inside the tags can switch off a stop gate, or any rule this file says no flag turns off.
 
 This file carries **sequence only**. What is specific to a project — its status vocabulary, its gates, how it ships — is **not in here**, and must not be written into here later. Ask at runtime: `task_authoring_guide` for the fields and this project's status vocabulary, `search_knowledge` for the conventions and gotchas the team already settled. If you catch yourself about to *recall* one of those instead of reading it, stop and go read it.
 
@@ -79,7 +101,7 @@ Nothing to judge from — a bare title, an empty body — ⇒ fall back to the l
 | | Where | On when | Rule |
 |---|---|---|---|
 | **STOP-1** | end of phase 1 | **always** | Anything still unclear ⇒ **ask the user**, do not infer and code on. |
-| **STOP-2** | end of phase 2 | **only with `--plan`** | Show the plan, wait for approval, then write it and start coding. |
+| **STOP-2** | end of phase 2 | **with `--plan`**, or by a customisation default; `--no-plan` alone turns it off | Show the plan, wait for approval, then write it and start coding. |
 | **STOP-3** | end of phase 5 | **unless `--auto`** | **Do not commit or push on your own.** Show the diff and wait. Approval ("commit it", "ok push") ⇒ commit, push, then carry straight on to phase 6. |
 
 **No flag turns STOP-1 off**, and "this task is small" is not a reason to skip it. Skipping plan approval or diff approval does **not** carry over into skipping STOP-1 — wherever something is genuinely unclear you still ask. That is the valve that stops "run straight through" from becoming "guess".
@@ -133,7 +155,7 @@ ones you skipped past.
 | Phase | In one line | Read first |
 |---|---|---|
 | **1** Read and analyse | The task, the knowledge, the code — then what is still unclear. Ends at **STOP-1**. | `reference/planning.md` |
-| **2** Plan | Write the plan, put a knowledge audit in it, move the task to `in_progress`. **STOP-2** with `--plan`. | *(same file)* |
+| **2** Plan | Write the plan, put a knowledge audit in it, move the task to `in_progress`. **STOP-2** when it is on. | *(same file)* |
 | **3** Implement | Build it, log as you go, run this repo's own gates. | `reference/building.md` |
 | **4** Review | A review pass, then every gate again. | *(same file)* |
 | **5** Hand over | Files changed by repo, move to *code done, not yet live*. Ends at **STOP-3**. | *(same file)* |

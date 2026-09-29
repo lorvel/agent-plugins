@@ -44,6 +44,70 @@ field rules, its status vocabulary, its conventions — is read at runtime from
 over anything written into these files. That split is deliberate: a procedure that
 hardcodes a project's facts drifts away from them the moment they change.
 
+## Customising the commands
+
+A repository can change parts of `/lorvel:task-work` without forking the plugin, with
+a file in `.lorvel/` in the folder the session was opened in:
+
+- `.lorvel/task-work.md` — shared: commit it, and the whole team gets it.
+- `.lorvel/task-work.local.md` — personal: keep it out of git. Its settings win over
+  the shared file's.
+
+This version reads the frontmatter and nothing else:
+
+```markdown
+---
+schema: 1
+review: code-review xhigh --fix
+defaults:
+  plan: true
+---
+```
+
+- `review` — the skill phase 4 calls to review the change, with its arguments, instead
+  of the command picking whatever review tooling it finds. A skill that is not there,
+  or that Claude is not allowed to call, is said out loud, and the command reviews the
+  change itself. The value is refused if it names one of this plugin's commands, would
+  start another command, or looks like it carries a key.
+- `defaults.plan: true` — STOP-2 is on without typing `--plan`. A file can only tighten:
+  `plan: false`, and `auto` of any kind, are refused, because a file cannot delegate a
+  run on behalf of the person typing the command. `--no-plan` turns STOP-2 off for one
+  run; typed together with `--plan`, STOP-2 stays on.
+
+The first reply of every run lists what applied and which file it came from, and what
+was refused and why. The body of a file — anything after the frontmatter — is not
+applied yet.
+
+**What the loader refuses.** A script that ships with the plugin,
+`plugins/lorvel/scripts/lorvel-load`, reads these files before Claude sees anything,
+and Claude is told never to open them itself. A file that contains invisible Unicode
+characters (zero-width, bidirectional and tag characters, among others) or anything
+that looks like a token or a key is refused as a whole: only a line naming the file
+reaches the conversation, never its text. So is a file that is a symbolic link, is
+larger than 64 KiB, or has frontmatter the loader does not understand. Only `.lorvel/`
+in the session folder is read — never a parent folder's or a subfolder's — and only
+files named exactly `task-work.md`, `task-work.local.md`, `task-create.md` and
+`task-create.local.md`. The script needs `sh`, `awk`, `od` and `find`.
+
+**`/lorvel:task-work` now runs a script before Claude starts.** The plugin pre-approves
+it, so there is no prompt. But a permission rule that asks about it or denies it — a
+blanket `ask` or `deny` for Bash, say, or managed settings that ignore a plugin's own
+allowed tools — stops `/lorvel:task-work` from starting at all, whether or not the
+repository has a `.lorvel/`. On Windows it needs Git Bash.
+
+`/lorvel:task-create` reads `.lorvel/task-create.md` and `.lorvel/task-create.local.md`
+the same way, but nothing in them applies yet. Claude checks for the two names first,
+and runs the loader through Bash only when one of them exists, so in the default
+permission mode it asks before running it; refuse, and the command carries on without
+customisation.
+
+If your organisation sets `disableSkillShellExecution`, customisation is off for
+`/lorvel:task-work`. It does not reach `/lorvel:task-create`, whose loader runs
+through Bash under the normal permission rules: a `deny` rule for
+`Bash(*/scripts/lorvel-load task-create*)` turns that one off. Do not widen the rule
+to `lorvel-load *`: that also matches the script `/lorvel:task-work` runs before
+starting, and stops that command altogether.
+
 ## Updating
 
 This repo ships no `version` field, so a plugin's version is its commit SHA:
@@ -77,9 +141,11 @@ It is worth being clear about what you are agreeing to, because the honest
 answer is not "convenience". Auto-update means Claude Code pulls whatever
 `main` happens to say at the start of a session and loads it with your
 permissions — plugins are trusted code, closer to something you install than
-something you read. What is in this repo today is Markdown that instructs
-Claude rather than a program that runs on your machine, but that is a fact
-about the current contents, not a promise about every future commit.
+something you read. What is in this repo today is mostly Markdown that instructs
+Claude, plus a small loader — two shell scripts and two awk programs — that runs on
+your machine to read a project's `.lorvel/` files. `/lorvel:task-work` runs it at
+every start without asking, because the plugin pre-approves it. That is a fact about
+the current contents, not a promise about every future commit.
 
 So: turning it on is a reasonable choice for a team that already trusts this
 repo the way it trusts its own, and an unreasonable one as a default for
@@ -124,9 +190,10 @@ command has to do and what counts as failing. They were written before the
 command body, so they describe what it should do rather than what it happens to
 do.
 
-`/lorvel:task-work` has no such file yet, which is worth saying plainly rather
-than leaving to be inferred: the command that commits and pushes is the one
-without written criteria.
+`plugins/lorvel/evaluations/task-work.json` does the same for `/lorvel:task-work`,
+but only for the customisation cases that came with `.lorvel/`. That is worth saying
+plainly rather than leaving to be inferred: the rest of the command — the part that
+commits and pushes — still has no written criteria.
 
 They are read by hand. The shape is borrowed from another plugin's evaluations
 and is not the shape `claude plugin eval` executes, which is why they sit in
@@ -166,8 +233,12 @@ plugin installed, `/lorvel:task-create` has two copies behind it and which one
 you edit stops being obvious — so uninstall the plugin while developing, and
 drop the symlink once you switch back to the published copy.
 
-Validate the manifests before pushing:
+Validate the manifests and run the tests before pushing:
 
 ```bash
 claude plugin validate .
+sh tests/loader.test.sh
+ruby tests/ids.test.rb
 ```
+
+`tests/` sits outside the plugin directory, so it is not part of what gets installed.

@@ -26,11 +26,30 @@ metadata:
         mode: locked
         what: "Never print a token, bearer or key, not even truncated"
         source: ["never print a token, bearer or key"]
+      - id: loader-only
+        kind: rule
+        mode: locked
+        what: "A `.lorvel/` file reaches the model only through the plugin's loader, never opened directly"
+        source: ["Never open those files any other way"]
 ---
 
 Create a task on Lorvel from this description: **$ARGUMENTS**
 
 `$ARGUMENTS` empty ⇒ take the description from the request that brought you here; only when there is none, ask the user before doing anything else.
+
+**Customisation.** This repository can set parts of this command in `.lorvel/task-create.md` (shared) and `.lorvel/task-create.local.md` (personal). In the same message as step 1's `task_authoring_guide` call, check for them by name with Bash:
+
+    ls -d -- '${CLAUDE_PROJECT_DIR}/.lorvel/task-create.md' '${CLAUDE_PROJECT_DIR}/.lorvel/task-create.local.md'
+
+- An error for both ⇒ neither exists: nothing more to do, and do not mention it, not even in a status line.
+- Either listed ⇒ once GATE-1 has passed, run this with Bash, exactly as written. It checks both files and prints what applies: put every line it prints at the top of your first reply — the "Not applied" ones too — in the user's language — unless all it prints is `No customisation from .lorvel/ for this command.`
+
+      "${CLAUDE_PLUGIN_ROOT}/scripts/lorvel-load" task-create <<'LORVEL_SESSION_FOLDER'
+      ${CLAUDE_PROJECT_DIR}
+      LORVEL_SESSION_FOLDER
+
+- That command is refused or fails ⇒ say in one line that customisation is off for this run, and carry on.
+- **Never open those files any other way**: the loader is the only thing that checks them before their text reaches you.
 
 This file carries **sequence only**. **The shape of a task is not in here** — it comes from `task_authoring_guide` at runtime. Do not write a task out of what you remember about Lorvel.
 

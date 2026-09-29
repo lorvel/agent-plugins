@@ -1,0 +1,4 @@
+# Claude Code runs these as they arrive. A CRLF ending in a script's first line, or in the heredoc
+# a SKILL.md hands the loader, cancels the whole command, so they keep LF on every checkout.
+/plugins/lorvel/scripts/* text eol=lf
+/plugins/lorvel/**/*.md text eol=lf

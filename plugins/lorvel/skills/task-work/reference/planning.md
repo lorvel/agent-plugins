@@ -15,15 +15,15 @@ Read this before phase 1. The stop gates that end these phases are stated in `SK
 
 1. `task_authoring_guide` for a `token`.
 
-   ⚠️ The token lives roughly fifteen minutes, and with `--plan` step 5 sits behind a human reading a plan. Expiring here is **ordinary, not a fault**: call the guide again for a fresh token and retry once. Never drop a plan the user already approved because a token aged out.
+   ⚠️ The token lives roughly fifteen minutes, and with STOP-2 on, step 5 sits behind a human reading a plan. Expiring here is **ordinary, not a fault**: call the guide again for a fresh token and retry once. Never drop a plan the user already approved because a token aged out.
 2. Write a plan with: **Context** · **Changes by file** · **Order of work** · **Definition of done** · **Risks and gotchas**.
 3. The order of work **must** include a **knowledge audit** step immediately before closing the task.
 4. Links inside Lorvel fields use `lorvel://task/<ref>`; when talking to the user, link the `url` from the response instead — `lorvel://` is a dead link in chat.
 5. **Write it**: `update_task` with the plan, then `log_progress` moving the task to `in_progress`.
 
-**With `--plan`** ⇒ insert **STOP-2** before step 5: show the plan in chat, wait, and only write and code once it is approved.
+**STOP-2 on** ⇒ insert it before step 5: show the plan in chat, wait, and only write and code once it is approved. It is on with `--plan`, and when this run's `<customisation>` block says STOP-2 is on by default — unless `--no-plan` was typed for this run without `--plan`. Look at that block now rather than trusting what you remember of the start of the run. No block in view ⇒ follow `customisation.md`, beside this file, before deciding.
 
-**Without the flag** ⇒ write it and carry on — but still **print the plan once** before coding, so the user can stop you if the direction is wrong.
+**STOP-2 off** ⇒ write it and carry on — but still **print the plan once** before coding, so the user can stop you if the direction is wrong.
 
 **If this task is a subtask** — as you move it to `in_progress`, check the parent:
 

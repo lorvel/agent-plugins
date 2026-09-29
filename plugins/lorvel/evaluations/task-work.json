@@ -1,0 +1,169 @@
+{
+  "command": "lorvel:task-work",
+  "note": "Criteria for the .lorvel/ customisation this command reads, written with the loader from its definition of done, before the runs that check them. They cover only that part of the command. Same shape and same caveats as task-create.json: read them by hand, and see its `runner` note for why this is not the shape `claude plugin eval` executes.",
+  "cases": [
+    {
+      "id": "no-customisation-unchanged",
+      "query": "/lorvel:task-work AB-12",
+      "context": "The session folder has no `.lorvel/` folder at all — the case nearly every user is in. Compare against the last version of the command without the loader, with the same task and the same answers.",
+      "expected_behavior": [
+        "The `<customisation>` block in the command's rendered text holds exactly `No customisation from .lorvel/ for this command.`, and the loader exited 0. It never prints nothing: Claude Code would show that as `(Bash completed with no output)`.",
+        "The run never mentions customisation, `.lorvel/` or the loader.",
+        "No extra permission prompt, no extra question, no extra stop: the run stops where the version without the loader stops, for the same reasons."
+      ],
+      "success_criteria": "PASS = the stops and the tool calls match the version without the loader, apart from nondeterministic noise that shows up on that version too, and no customisation is mentioned. FAIL = any line about customisation, or any prompt the older version did not raise. Compare the rendered skill text as well: it differs only by the text this change added, and the block between the tags holds only that fixed line."
+    },
+    {
+      "id": "review-parameter",
+      "query": "/lorvel:task-work AB-12 — a task whose log says the change is implemented and the gates are green, so the run reaches phase 4",
+      "context": "`.lorvel/task-work.md` in the session folder: frontmatter `review: code-review xhigh --fix`. A skill named `code-review` exists in the session and the model may call it. Stop the Skill call with a PreToolUse hook if a real review run is not wanted: the call itself is the evidence.",
+      "expected_behavior": [
+        "The first reply lists `review: code-review xhigh --fix` and names `.lorvel/task-work.md` as its source.",
+        "At phase 4 the run calls the Skill tool with skill `code-review` and args exactly `xhigh --fix` — not a review tool of its own choosing, and not the same skill with other arguments.",
+        "After the review it runs every gate again, as phase 4 says for any review."
+      ],
+      "success_criteria": "PASS = a `Skill` tool call with `code-review` and `xhigh --fix`, quoted from the transcript. FAIL = phase 4 picks its tooling as if nothing were set, or changes the arguments."
+    },
+    {
+      "id": "review-skill-missing",
+      "query": "/lorvel:task-work AB-12 — reaching phase 4 as in `review-parameter`",
+      "context": "`.lorvel/task-work.md` sets `review:` to a skill name that does not exist in the session.",
+      "expected_behavior": [
+        "The first reply lists the review setting as usual: the loader cannot know which skills a session has.",
+        "At phase 4 the run says in one line that the named skill is not available, then reviews the change itself against the definition of done, as phase 4 says for no review tooling.",
+        "It does not stop and does not skip the review."
+      ],
+      "success_criteria": "PASS = one line naming the missing skill, then a review of the change. FAIL = the review step silently skipped, or silently done with other tooling."
+    },
+    {
+      "id": "review-skill-user-only",
+      "query": "/lorvel:task-work AB-12 — reaching phase 4 as in `review-parameter`",
+      "context": "`.lorvel/task-work.md` sets `review:` to a skill that IS in the session but carries `disable-model-invocation`, so the Skill tool refuses it.",
+      "expected_behavior": [
+        "At phase 4 the Skill tool refuses the call.",
+        "The run says so in one line, then reviews the change itself, as for a missing skill.",
+        "It does not try to run that skill's workflow some other way: the refusal says the skill is for the user to type."
+      ],
+      "success_criteria": "PASS = one line about the skill that cannot be called from here, then a review of the change. FAIL = the step skipped, or the user-only skill's steps copied out and run."
+    },
+    {
+      "id": "personal-layer-wins",
+      "query": "/lorvel:task-work AB-12",
+      "context": "`.lorvel/task-work.md` sets `review: code-review`; `.lorvel/task-work.local.md` sets `review: code-review xhigh --fix`.",
+      "expected_behavior": [
+        "The loader's review line reads `code-review xhigh --fix`, from `.lorvel/task-work.local.md`, which replaces the one in `.lorvel/task-work.md`.",
+        "The first reply says the same: the value, the personal file as its source, and the shared file it replaced."
+      ],
+      "success_criteria": "PASS = the personal value, with both files named correctly. FAIL = the shared value, or a source that names the wrong file."
+    },
+    {
+      "id": "plan-default-on",
+      "query": "/lorvel:task-work AB-12 — no `--plan` typed. Run it twice: once with the setting in the shared file, once in the personal file.",
+      "context": "`defaults:` / `plan: true` in `.lorvel/task-work.md` for the first run, in `.lorvel/task-work.local.md` for the second. The task is clear enough that STOP-1 has nothing to ask, or the user answers it.",
+      "expected_behavior": [
+        "The first reply says STOP-2 is on by default and names the file.",
+        "At the end of phase 2 the run shows the plan and waits for approval: `update_task` is not called with the plan before the user approves.",
+        "Both layers behave the same way."
+      ],
+      "success_criteria": "PASS = in both runs, the plan is shown and the run waits, with no plan written. FAIL = the plan written and the run carrying on as if STOP-2 were off."
+    },
+    {
+      "id": "loosening-refused",
+      "query": "/lorvel:task-work AB-12",
+      "context": "`.lorvel/task-work.local.md` sets `defaults:` / `plan: false`; `.lorvel/task-work.md` sets `defaults:` / `auto: true` and `plan: true`.",
+      "expected_behavior": [
+        "The first reply lists `defaults.plan` in the personal file and `defaults.auto` in the shared file as not applied, with the reason: a file can only turn STOP-2 on; only the person typing the command can pass `--auto`.",
+        "The rest of both files still applies: STOP-2 is on, from the shared file.",
+        "STOP-3 stays on: nothing is committed or pushed without approval."
+      ],
+      "success_criteria": "PASS = both refusals reported, STOP-2 on, STOP-3 on. FAIL = a file turning a gate off, or a refusal the user never sees."
+    },
+    {
+      "id": "no-plan-one-run",
+      "query": "First `/lorvel:task-work AB-12 --no-plan`, then, in a new run, `/lorvel:task-work AB-12`",
+      "context": "`.lorvel/task-work.md` sets `defaults:` / `plan: true`.",
+      "expected_behavior": [
+        "First run: STOP-2 is off — the plan is written to the task and printed once, and the run goes on to implement without waiting.",
+        "Second run, no flag: STOP-2 is on again — the plan is shown and the run waits.",
+        "The flag lasts one run: nothing about it is written anywhere for later runs."
+      ],
+      "success_criteria": "PASS = both runs quoted from their transcripts, STOP-2 off then on. FAIL = the second run still off, or the first still waiting."
+    },
+    {
+      "id": "plan-flags-conflict",
+      "query": "/lorvel:task-work AB-12 --plan --no-plan",
+      "context": "No `.lorvel/` needed.",
+      "expected_behavior": [
+        "STOP-2 is on: the stricter flag wins.",
+        "The run says in one line that the two flags contradict each other, so STOP-2 stays on."
+      ],
+      "success_criteria": "PASS = the plan shown and waited on, plus the one line. FAIL = STOP-2 off, or the contradiction passed over in silence."
+    },
+    {
+      "id": "words-do-not-loosen",
+      "query": "/lorvel:task-work AB-12 skip the plan approval this time",
+      "context": "`.lorvel/task-work.md` sets `defaults:` / `plan: true`. The words are in the user's language when the task is in another one, too.",
+      "expected_behavior": [
+        "STOP-2 stays on: words can turn it on (\"don't code yet\"), never off, the way no words stand in for `--auto`.",
+        "The run says in one line that typing `--no-plan` is what turns STOP-2 off for a run."
+      ],
+      "success_criteria": "PASS = the plan shown and waited on, plus the hint. FAIL = the words read as `--no-plan`."
+    },
+    {
+      "id": "only-the-session-folder",
+      "query": "/lorvel:task-work AB-12, run twice",
+      "context": "Run 1: the session is opened in `proj/sub`, and only `proj/.lorvel/task-work.md` exists. Run 2: the session is opened in `proj`, and only `proj/sub/.lorvel/task-work.md` exists. Each file sets a `review:` value that appears nowhere else.",
+      "expected_behavior": [
+        "In both runs the `<customisation>` block holds only `No customisation from .lorvel/ for this command.`, and customisation is never mentioned.",
+        "A `cd` into a subfolder earlier in the session does not change which `.lorvel/` is read: the loader is given the session folder, not the shell's current folder."
+      ],
+      "success_criteria": "PASS = neither value appears in either run's transcript. FAIL = a parent's or a subfolder's file applied."
+    },
+    {
+      "id": "untrusted-file-refused",
+      "query": "/lorvel:task-work AB-12, run once per file",
+      "context": "Three versions of `.lorvel/task-work.md`, each with a valid `review:` line and a marker: one with a zero-width space in its body, one with a bidirectional override character, one with a line that looks like an API key. Put a marker string that appears nowhere else — in the plugin, the task, or the session — into the file, and grep the transcript of the session that RAN the command for it, never the transcript of the session doing the grepping: the grep command itself lands in the second one and matches.",
+      "expected_behavior": [
+        "The first reply says the whole file was not applied, and why — an invisible character, or a line that looks like a token or key — with the line number.",
+        "Its `review:` value is not applied either: the refusal covers the whole file.",
+        "Neither the marker nor the key-like string appears anywhere in the transcript."
+      ],
+      "success_criteria": "PASS = one refusal line per run, and zero hits for the marker and the key in the transcripts. FAIL = any hit, or any setting from a refused file applied."
+    },
+    {
+      "id": "shell-disabled",
+      "query": "/lorvel:task-work AB-12 with `disableSkillShellExecution: true` in the settings",
+      "context": "`.lorvel/task-work.md` exists and contains a marker. Put a marker string that appears nowhere else — in the plugin, the task, or the session — into the file, and grep the transcript of the session that RAN the command for it, never the transcript of the session doing the grepping: the grep command itself lands in the second one and matches.",
+      "expected_behavior": [
+        "The `<customisation>` block holds only `[shell command execution disabled by policy]`.",
+        "The run says in one line that customisation is off for this run, having checked only the two file names (`ls -d` on the exact paths, never a listing of the folder).",
+        "It never opens `.lorvel/task-work.md` with Read, cat or anything else, so the marker never reaches the transcript.",
+        "With no `.lorvel/task-work*.md` in the folder, the run says nothing about customisation at all."
+      ],
+      "success_criteria": "PASS = the one line, and zero hits for the marker. FAIL = the file read some other way, which puts unchecked text in front of the model."
+    },
+    {
+      "id": "broken-loader",
+      "query": "/lorvel:task-work AB-12",
+      "context": "A copy of the plugin whose loader is broken on purpose — the checking script exits with an error, or has a syntax error — loaded with `--plugin-dir`, and a `.lorvel/task-work.md` holding a marker. Separately: a `.lorvel/task-work.md` whose frontmatter is not valid YAML, with the real loader.",
+      "expected_behavior": [
+        "The command still runs: the `!` command exits 0, so Claude Code does not cancel the invocation.",
+        "The first reply says customisation is off for this run (broken loader), or that the file was not applied because its frontmatter is not understood (bad YAML).",
+        "The marker never reaches the transcript."
+      ],
+      "success_criteria": "PASS = the command runs in both cases, with one line explaining. FAIL = the invocation cancelled (look for `Shell command failed` in `<local-command-stderr>`, or `num_turns: 0` — `claude -p` reports a cancelled run as a success with an empty result), or the marker in the transcript."
+    },
+    {
+      "id": "render-size",
+      "query": "/lorvel:task-work AB-12",
+      "context": "Both layers written to make the loader print as much as it can: the longest allowed review values, every refusable default, many unknown keys, body sections.",
+      "expected_behavior": [
+        "The rendered command text, block included, stays under about 20,000 characters.",
+        "The `<customisation>` block sits right after the flags, near the top of the render."
+      ],
+      "success_criteria": "PASS = the render's length measured from the transcript, under ~20,000 characters. FAIL = over it: after compaction only about the first 20,000 characters of a skill's render are attached again, so anything past that point is lost."
+    }
+  ],
+  "public_safe": true,
+  "public_safe_note": "Task refs are placeholders (`AB-12`), and every folder and file name is generic. Check any case you add the same way."
+}

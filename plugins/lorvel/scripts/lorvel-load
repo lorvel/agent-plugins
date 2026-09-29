@@ -1,0 +1,63 @@
+#!/bin/sh
+# lorvel-load <task-work|task-create> [<session folder>]
+#
+# Reads that command's customisation from <session folder>/.lorvel/, checks it, and prints what
+# applies — or one fixed line when there is none, since Claude Code shows a `!` command that prints
+# nothing as "(Bash completed with no output)". The folder comes from the second argument, or else
+# from the first line of standard input.
+#
+# Always exits 0. A `!` command in a skill that exits non-zero cancels the whole command, for
+# everyone who installed the plugin, so any failure in here becomes one line saying customisation
+# is off for this run.
+
+header='Customisation from .lorvel/, checked by the lorvel plugin:'
+none='No customisation from .lorvel/ for this command.'
+off() {
+  printf 'Customisation from .lorvel/ is off for this run: %s\n' "$1"
+  exit 0
+}
+
+skill=${1-}
+folder=${2-}
+if [ -z "$folder" ]; then
+  IFS= read -r folder || :
+  if IFS= read -r more; then
+    off "the name of the folder this session was opened in has a line break in it, so nothing in .lorvel/ was read."
+  fi
+fi
+
+case $skill in
+  task-work|task-create) ;;
+  *) off "the loader was called for a command it does not know, so nothing in .lorvel/ was read." ;;
+esac
+[ -n "$folder" ] || off "the loader was not told which folder this session was opened in, so nothing in .lorvel/ was read."
+
+# listed <folder> <name>: <folder> holds an entry named exactly <name>. `[ -e ]` would also find
+# Task-Work.md on a disk that ignores case; find compares the names as they are stored.
+listed() {
+  [ -n "$(find "$1/." ! -name . -prune -name "$2" -print 2>/dev/null)" ]
+}
+
+dir=$folder/.lorvel
+if [ ! -L "$dir" ]; then
+  [ -d "$dir" ] || { printf '%s\n' "$none"; exit 0; }
+  if [ -r "$dir" ] && [ -x "$dir" ]; then
+    listed "$dir" "$skill.md" || listed "$dir" "$skill.local.md" || { printf '%s\n' "$none"; exit 0; }
+  fi
+fi
+
+here=$(cd "$(dirname "$0")" 2>/dev/null && pwd) || off "the loader could not find its own folder, so nothing in .lorvel/ was applied."
+out=$(sh "$here/lorvel-load.sh" "$skill" "$folder" 2>/dev/null) || off "the loader failed, so nothing in .lorvel/ was applied."
+[ -n "$out" ] || off "the loader failed, so nothing in .lorvel/ was applied."
+
+# The last filter: only the line shapes the checking half prints, in printable ASCII plus the dash
+# it uses. Anything else means that half is broken, and nothing of it reaches the model.
+printf '%s\n' "$out" | LC_ALL=C awk '
+  { line = $0; gsub(/\342\200\224/, "", line) }
+  line ~ /[^ -~]/ { bad = 1 }
+  $0 !~ /^- (review: |STOP-2 on by default |Not applied: |Nothing in )/ { bad = 1 }
+  END { exit bad }
+' || off "the loader failed, so nothing in .lorvel/ was applied."
+
+printf '%s\n%s\n' "$header" "$out"
+exit 0

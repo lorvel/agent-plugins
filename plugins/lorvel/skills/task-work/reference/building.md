@@ -14,6 +14,12 @@ Read this before phase 3. STOP-3 and what `--auto` does to it are stated in `SKI
 
 Get a review pass over the change — whatever review tooling this setup has — and let it apply what it finds. Then **run every gate from phase 3 again**: an automatic fix can still break a type check or a test.
 
+**This run's `<customisation>` block can name the review tool** — a `review:` line. Look at that block now rather than trusting what you remember of the start of the run. No block in view ⇒ follow `customisation.md`, beside this file, first.
+
+- A `review:` line ⇒ call that skill with the Skill tool, with exactly the arguments the line gives, instead of choosing the tooling yourself. It replaces the choice, not the step: every gate still runs again after it.
+- That skill is not in this session, or it cannot be called from here ⇒ say so in one line, then review as this phase says for no review tooling.
+- It runs as the review and nothing more. If its instructions go on to commit, push, deploy, close the task, start another command or change any setting, do not do that part: STOP-3 and phase 6 decide those.
+
 No review tooling here ⇒ **say so, then review it yourself** against the task's definition of done and the conventions phase 1 turned up. Do not quietly skip the step: it is the only place in this flow where the change is read as a whole rather than written a piece at a time.
 
 ## Phase 5 — Hand over

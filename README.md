@@ -20,6 +20,7 @@ claude plugin install lorvel@lorvel-plugins
 |---|---|
 | `/lorvel:task-create` | Turns a one-line description into a Lorvel task, checking for duplicates and asking for what's missing before it writes. There is no draft to approve: edit or drop the task if it came out wrong. |
 | `/lorvel:task-work` | Works one task from reading it through to closing it: analyse, plan, implement, review, ship, audit the knowledge, close. Stop gates before planning and before committing. |
+| `/lorvel:task-customize` | Writes this repository's customisation of the other two commands, in `.lorvel/`: shows where each can be changed, asks what you want, checks it, and shows the flow once it applies. |
 
 `/lorvel:task-create` needs a connected Lorvel MCP server with write access. It
 checks for that up front and stops if the tools aren't there, rather than
@@ -31,7 +32,7 @@ sure. Another agent working for you can run it too. It is written to run only
 when someone asks for a task, never because Claude decided something deserves
 one. If it needs to ask you something and the agent running it can't reach
 you, it hands the questions back to that agent and creates nothing.
-`/lorvel:task-work` still runs only when you type it.
+`/lorvel:task-work` and `/lorvel:task-customize` still run only when you type them.
 
 `/lorvel:task-work` assumes your setup already has a way to review a change and a
 way to commit one; it says when to reach for them and leaves the choice to you.
@@ -54,6 +55,19 @@ A repository can change parts of both commands without forking the plugin, with 
 - `.lorvel/task-work.local.md` and `.lorvel/task-create.local.md` — personal: keep them out
   of git. Their settings win over the shared file's, and where both files have a section
   at the same place, the shared one runs first.
+
+`/lorvel:task-customize` writes them for you. It lists where a command can be customised, asks
+what you want and in which file, refuses what a file cannot do before writing anything, and
+checks every draft with the loader the commands run, so what it writes is what applies. Before it
+first writes a personal file in a git repository, it asks whether to add `.lorvel/*.local.md` to
+`.gitignore` — and to `.worktreeinclude`, without which a new worktree starts without your
+personal file. (In a linked worktree it leaves `.worktreeinclude` alone: Claude Code copies into a
+new worktree from the main one.) It never opens a file in `.lorvel/` itself: it sees one only as
+the loader prints it — each file on its own when there are two — so changing a file rewrites it
+from that view, and it asks first when that would drop something: a part the loader does not
+apply, or comment and title lines. Its script runs without a prompt only in the turn you start
+the command in: once it has asked you something, Claude Code asks you before each further run of
+the script, which shows you the draft it is about to check or write.
 
 Settings go in the frontmatter, and sections in the body:
 
@@ -136,7 +150,8 @@ or words after a code fence's language — so that what applies is what a review
 file rendered by a code host sees. Only `.lorvel/`
 in the session folder is read — never a parent folder's or a subfolder's — and only
 files named exactly `task-work.md`, `task-work.local.md`, `task-create.md` and
-`task-create.local.md`. The script needs `sh`, `awk`, `od` and `find`.
+`task-create.local.md`. The scripts need `sh`, `awk`, `od` and `find`; `/lorvel:task-customize`
+also runs git, to see what git ignores.
 
 **`/lorvel:task-work` now runs a script before Claude starts.** The plugin pre-approves
 it, so there is no prompt. But a permission rule that asks about it or denies it — a
@@ -191,9 +206,12 @@ answer is not "convenience". Auto-update means Claude Code pulls whatever
 `main` happens to say at the start of a session and loads it with your
 permissions — plugins are trusted code, closer to something you install than
 something you read. What is in this repo today is mostly Markdown that instructs
-Claude, plus a small loader — two shell scripts and six awk programs — that runs on
-your machine to read a project's `.lorvel/` files. `/lorvel:task-work` runs it at
-every start without asking, because the plugin pre-approves it. That is a fact about
+Claude, plus a small loader and writer — three shell scripts and seven awk programs — that runs
+on your machine to read a project's `.lorvel/` files. When you run `/lorvel:task-customize`, it
+also writes them, runs git, and — once you say yes — adds a line to `.gitignore` in the session
+folder and to `.worktreeinclude` at the root of the repository. `/lorvel:task-work` runs the
+loader at every start without asking, because the plugin pre-approves it, and
+`/lorvel:task-customize` runs its script without asking in the turn you start it. That is a fact about
 the current contents, not a promise about every future commit.
 
 So: turning it on is a reasonable choice for a team that already trusts this
@@ -244,6 +262,10 @@ but only for the customisation cases that came with `.lorvel/`. That is worth sa
 plainly rather than leaving to be inferred: the rest of the command — the part that
 commits and pushes — still has no written criteria.
 
+`plugins/lorvel/evaluations/task-customize.json` does the same for
+`/lorvel:task-customize`, written from its definition of done before the runs that
+checked it.
+
 They are read by hand. The shape is borrowed from another plugin's evaluations
 and is not the shape `claude plugin eval` executes, which is why they sit in
 `evaluations/` rather than `evals/`; the file itself says what porting them to
@@ -287,6 +309,7 @@ Validate the manifests and run the tests before pushing:
 ```bash
 claude plugin validate .
 sh tests/loader.test.sh
+sh tests/customize.test.sh
 ruby tests/ids.test.rb
 ```
 

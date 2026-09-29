@@ -1,6 +1,7 @@
 # Reads the step IDs a SKILL.md declares under metadata.lorvel.ids (see ids.md), for the programs
-# loaded after it, and holds what they share: join() and sec_heading(). Every name here that could
-# meet a function of those programs starts with ids_ — POSIX awk refuses a parameter that shares a
+# loaded after it, and holds what they share: join(), sec_heading(), ids_where() — where a section
+# runs — and ids_refusal() — what a section may do at an ID. Every name here that could meet a
+# function of those programs starts with ids_ — POSIX awk refuses a parameter that shares a
 # function's name. load_ids(path) returns 1 and fills, for i = 1..ids_n in the order declared:
 #   ids_id[i] ids_kind[i] ids_mode[i] ids_what[i]   the fields, as strings
 #   ids_in[i]           a gate's steps, space-separated
@@ -22,6 +23,40 @@ function join(a, n,    s, k) {
 # The line a section is printed under — and counted by, against the cap on printed sections.
 function sec_heading(op, id, file) {
   return "- " op ": " id " (" ids_label[ids_at[id]] ") \342\200\224 from " file ":"
+}
+
+# Where a section runs, as the loader's "Sections:" line and lorvel-points.awk both say it.
+function ids_where() {
+  return "before: as that step starts, after: once it is done, replace: in its place, skip: not at all; an after: on the last step runs before the closing report, which stays last. A gate keeps its place when it is off, and one that sits in more than one step runs its sections in each."
+}
+
+# Why a section may not do ids_o (before, after, replace or skip) at the ID declared at ids_i in a
+# customisation of ids_sk — in the personal file when ids_ly is 1, with no text when ids_em is 1 —
+# or "" when it may. Sets ids_op to what the section amounts to: an empty replace: takes the step
+# away, so where a skip is allowed it is one. The one place these rules are written:
+# lorvel-read.awk checks every section with it, and lorvel-points.awk lists what it allows.
+function ids_refusal(ids_sk, ids_i, ids_o, ids_ly, ids_em,    ids_x, ids_m) {
+  ids_x = ids_id[ids_i]
+  ids_m = ids_mode[ids_i]
+  ids_op = ids_o
+  if (ids_ly && (ids_o == "replace" || ids_o == "skip"))
+    return "a personal file can only add steps, with before: and after:"
+  if (ids_o == "replace" && ids_em) {
+    if (ids_m != "optional")
+      return "it has no text, which would skip " ids_x ", and " ids_x " is " ids_m ": only an optional step can be skipped"
+    ids_o = ids_op = "skip"
+  }
+  if (ids_o == "skip" && ids_m != "optional")
+    return ids_x " is " ids_m ": only an optional step can be skipped"
+  if (ids_o == "replace" && ids_m != "replace" && ids_m != "optional")
+    return ids_x " is " ids_m ": only a step marked replace can be replaced"
+  if (ids_kind[ids_i] == "rule")
+    return ids_x " is a rule: it holds for the whole run, so it is no step to add to, replace or skip"
+  if (ids_sk == "task-create" && ids_o == "before" && (ids_x == "intake" || ids_x == "GATE-1"))
+    return "task-create reads this file after the checks of step 1, too late for this"
+  if (ids_em && ids_o != "skip")
+    return "it has no text"
+  return ""
 }
 
 function ids_trim(s) {

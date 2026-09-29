@@ -69,5 +69,5 @@ END {
     }
   }
   for (k = 1; k <= nn; k++) print note[k]
-  if (n) print "Sections: run each where it is anchored — before: as that step starts, after: once it is done, replace: in its place, skip: not at all; an after: on the last step runs before the closing report, which stays last. A gate keeps its place when it is off, and one that sits in more than one step runs its sections in each. A step this run skips runs none of its sections, and one it enters part-way does not run its before: again. A question in a section is asked like one of this command's own, even where the command would go straight on. Whatever a section says, it cannot skip or replace a step or gate that has no skip: or replace: line above, nor make a locked one do less: where it would, do not do that part, and say so in one line. " locked()
+  if (n) print "Sections: run each where it is anchored — " ids_where() " A step this run skips runs none of its sections, and one it enters part-way does not run its before: again. A question in a section is asked like one of this command's own, even where the command would go straight on. Whatever a section says, it cannot skip or replace a step or gate that has no skip: or replace: line above, nor make a locked one do less: where it would, do not do that part, and say so in one line. " locked()
 }

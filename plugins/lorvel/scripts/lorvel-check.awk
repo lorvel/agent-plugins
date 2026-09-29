@@ -1,7 +1,8 @@
 # The last filter lorvel-load runs over what lorvel-load.sh printed, before any of it reaches the
 # model. Load lorvel-token.awk first. Prints OK when every line has a shape that half prints, and
 # nothing otherwise — so a missing or truncated copy of this file lets nothing through:
-#   - the "- " lines, in printable ASCII plus the dash the loader uses;
+#   - the "- " lines, in printable ASCII plus the dash the loader uses, and the verdict on a
+#     draft that lorvel-customize asks for;
 #   - a section's text, each line quoted with "  > ", only right under its own
 #     "- <op>: <ID> (<label>) — from <file>:" line;
 #   - after any section, one "Sections:" line, last.
@@ -30,6 +31,8 @@
     closed = 1
     next
   }
+  # What lorvel-customize asks for about a draft, and nothing else of that shape.
+  if (line ~ "^- Draft [.]lorvel/[a-z.-]+[.]md: (applies|does not apply) in full$") next
   if (line !~ /^- (review: |STOP-2 on by default |Not applied: |Nothing in )/) bad = 1
 }
 

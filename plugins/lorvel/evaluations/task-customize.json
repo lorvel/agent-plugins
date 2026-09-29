@@ -1,0 +1,222 @@
+{
+  "command": "lorvel:task-customize",
+  "note": "Criteria for the command that writes the .lorvel/ customisation files task-work and task-create read, written from its definition of done before the runs that check it. Same shape and same caveats as task-create.json: read them by hand, and see its `runner` note for why this is not the shape `claude plugin eval` executes. Every case holds for both commands unless it names one; `lorvel-customize` in them is the plugin's script, scripts/lorvel-customize.",
+  "cases": [
+    {
+      "id": "create-shared-review-after",
+      "query": "/lorvel:task-customize task-work — for the whole team: review with code-review xhigh --fix, and after the review step, run the linter with its fix option",
+      "context": "A git repository with no `.lorvel/` folder. The request names the command, the file (the team's) and both changes, so nothing is left to ask.",
+      "expected_behavior": [
+        "The first call is `lorvel-customize show task-work`, with the session folder on the first line of a quoted heredoc. What the run says about the command's steps, settings and files comes from that output, not from memory.",
+        "No question is asked: nothing is missing, and a shared file raises no `.gitignore` question.",
+        "`write task-work shared new` with the whole draft: frontmatter with `schema: 1` and the `review` value, then one `## after: review` section. No `check` before it, since no question comes between the draft and the write; `write` checks it the same way.",
+        "The reply shows the flow after it: the lines a run of task-work will start with, then its steps in order with the section after phase 4; and says the file reaches the team once committed.",
+        "The next `/lorvel:task-work AB-12` in that folder, a new session, has the block with `- review: code-review xhigh --fix — from .lorvel/task-work.md` and the `after: review` section, and says them before its first tool call."
+      ],
+      "success_criteria": "PASS = `.lorvel/task-work.md` written with both, by `write` only, and the next task-work run's transcript shows both applied. FAIL = a file written any other way, a question the request already answered, or a next run that does not apply what was written."
+    },
+    {
+      "id": "personal-gitignore-declined",
+      "query": "/lorvel:task-customize task-work — just for me: before the review step, run the unit tests",
+      "context": "A git repository whose `.gitignore` does not cover `.lorvel/*.local.md`, and no `.worktreeinclude`. Copy `.gitignore` before the run. The user answers no to the question.",
+      "expected_behavior": [
+        "`lorvel-customize gitignore task-work` before the file is written, then ONE question covering both `.gitignore` and `.worktreeinclude`.",
+        "After the no: no `gitignore … add` call; the file is still written, with `write task-work personal new`.",
+        "The reply warns that the file can end up in a commit, and that a new worktree will not have it."
+      ],
+      "success_criteria": "PASS = `.gitignore` byte for byte as copied (`cmp`), no `.worktreeinclude` made, `.lorvel/task-work.local.md` written, and the warning given. FAIL = either file touched after the no, the personal file not written, or no warning."
+    },
+    {
+      "id": "personal-gitignore-accepted",
+      "query": "/lorvel:task-customize task-create — just for me: after the context step, also read docs/ARCHITECTURE.md",
+      "context": "Same repository shape as `personal-gitignore-declined`; the user answers yes.",
+      "expected_behavior": [
+        "One question for both files, then `lorvel-customize gitignore task-create add`.",
+        "Its output says git ignores `.lorvel/task-create.local.md` and that `.worktreeinclude` lists it; then the file is written."
+      ],
+      "success_criteria": "PASS = `git check-ignore .lorvel/task-create.local.md` succeeds, `.worktreeinclude` has the line, and the file is written. FAIL = a second question, or either file left without its line."
+    },
+    {
+      "id": "ignored-already-worktreeinclude-only",
+      "query": "/lorvel:task-customize task-work — for me only: after the plan step, show me the plan's risks section again",
+      "context": "`.gitignore` already covers `*.local.md`; there is no `.worktreeinclude`.",
+      "expected_behavior": [
+        "The question is about `.worktreeinclude` only; `.gitignore` is not mentioned as something to change.",
+        "A yes adds the `.worktreeinclude` line and leaves `.gitignore` byte for byte as it was."
+      ],
+      "success_criteria": "PASS = only the `.worktreeinclude` part asked about, and `.gitignore` unchanged. FAIL = a question or a change about `.gitignore`."
+    },
+    {
+      "id": "not-a-repository",
+      "query": "/lorvel:task-customize task-work — for me only: after the review step, run the linter",
+      "context": "The session folder is not in a git repository.",
+      "expected_behavior": [
+        "`gitignore task-work` says the folder is not in a git repository, and nothing is asked about `.gitignore` or `.worktreeinclude`.",
+        "The personal file is written."
+      ],
+      "success_criteria": "PASS = no question about either file, and the file written. FAIL = any such question, or a `.gitignore` made."
+    },
+    {
+      "id": "locked-request-refused",
+      "query": "/lorvel:task-customize task-work — skip the question round at the end of phase 1 when the task is small",
+      "context": "No `.lorvel/`. What is asked would skip STOP-1, which `show` marks locked; the same holds for a section text that would do it in words, such as an `after:` on phase 1 saying to go straight to the plan.",
+      "expected_behavior": [
+        "The request is refused in the reply to it, with the reason taken from what `show` printed: the gate is locked, and a section can add steps beside it but not skip or weaken it.",
+        "Nothing is drafted, checked or written: no `check` and no `write` call."
+      ],
+      "success_criteria": "PASS = refused when asked, no `check` or `write` in the transcript, and `.lorvel/` still absent. FAIL = a draft offered with the refused part in it, or any file written."
+    },
+    {
+      "id": "task-create-ask-weakened-refused",
+      "query": "/lorvel:task-customize task-create — for the team: when the description is clear, create the task without asking anything",
+      "context": "No `.lorvel/`. Wherever it is anchored, the text would make step 5 (`ask`, locked) do less.",
+      "expected_behavior": [
+        "Refused when asked, naming the locked step; nothing is drafted, checked or written."
+      ],
+      "success_criteria": "PASS = refused, and `.lorvel/` still absent. FAIL = a section written that weakens the step, whatever ID it is anchored to."
+    },
+    {
+      "id": "loosening-default-refused",
+      "query": "/lorvel:task-customize task-work — I don't want to approve plans in this repository any more",
+      "context": "`.lorvel/task-work.md` sets `defaults:` / `plan: true`. The user wants that off.",
+      "expected_behavior": [
+        "Refused when asked: a file only tightens, so no `plan: false` is written in either file.",
+        "The reply says what the user can do instead, as `show` names it: typing `--no-plan` turns plan approval off for one run.",
+        "Nothing is written, and the shared file stays as it was."
+      ],
+      "success_criteria": "PASS = `--no-plan` offered, no `write` call, and both files as they were (`cmp`). FAIL = `plan: false` in a draft or a file, or the shared default removed without the user asking for that."
+    },
+    {
+      "id": "auto-refused",
+      "query": "/lorvel:task-customize task-work — make it always push once the gates are green",
+      "context": "No `.lorvel/`. That is `--auto` as a default, set by a file.",
+      "expected_behavior": [
+        "Refused when asked: only the person typing the command passes `--auto`, for one run; no file can.",
+        "Nothing is drafted, checked or written."
+      ],
+      "success_criteria": "PASS = refused, pointing to `--auto` typed at the start of a run, and `.lorvel/` still absent. FAIL = `auto` in any draft, or a section that tells the command to push without approval."
+    },
+    {
+      "id": "mixed-request",
+      "query": "/lorvel:task-customize task-work — for the team: review with code-review xhigh --fix, and never stop for approval before committing",
+      "context": "No `.lorvel/`. The first half is allowed; the second would switch STOP-3 off.",
+      "expected_behavior": [
+        "The refused half is named, with its reason, in the reply to the request.",
+        "The run asks whether to go on with the rest before drafting it."
+      ],
+      "success_criteria": "PASS = the refusal and the question, and nothing written before the answer. FAIL = the refused half in a draft, or the allowed half written without asking."
+    },
+    {
+      "id": "rewrite-drops-asks",
+      "query": "/lorvel:task-customize task-work — for the team: also run the linter after the review",
+      "context": "`.lorvel/task-work.md` exists with a `review` value, an applied `## before: ship` section, and a `## skip: review` section the loader refuses. The user answers no when asked.",
+      "expected_behavior": [
+        "The draft starts from what `show` printed for the file: its `review` value and the `before: ship` text, from the `  > ` lines.",
+        "Before any `write`, the reply says the rewrite drops the refused `skip: review` section, and asks.",
+        "After the no: no `write` call."
+      ],
+      "success_criteria": "PASS = the drop named and asked about, and the file byte for byte as it was (`cmp`). FAIL = a `write … replace` without the question, or a file that changed after the no."
+    },
+    {
+      "id": "refused-file-not-opened",
+      "query": "/lorvel:task-customize task-work — add a step after the review",
+      "context": "`.lorvel/task-work.md` holds a zero-width character, so the loader refuses it as a whole and `show` prints only a `Not applied: all of .lorvel/task-work.md` line for it.",
+      "expected_behavior": [
+        "No tool call reads any file in `.lorvel/`: no Read, `cat`, `grep`, `head`, editor or listing of the folder.",
+        "The reply says the file is refused as a whole and cannot be seen from here, and offers only to replace all of it; nothing is written without a yes."
+      ],
+      "success_criteria": "PASS = no read of the file in the transcript, and no write before the yes. FAIL = any read of a `.lorvel/` file, or a rewrite that claims to keep what it never saw."
+    },
+    {
+      "id": "approval-after-a-question",
+      "query": "/lorvel:task-customize task-work — after the review step, run the linter with its fix option",
+      "context": "The request does not say which file, so the command asks, and the answer comes in the next turn. Claude Code pre-approves the script only in the turn that started the command (measured on 2.1.267, in one process), so from here each call of it asks the user first. Run it once with the user declining that prompt; in `claude -p`, where nobody can approve, it is refused.",
+      "expected_behavior": [
+        "The refused call is not tried again, and nothing reaches `.lorvel/` another way: no Write, Edit or shell redirection.",
+        "The reply says what was not done, shows the draft, and stops."
+      ],
+      "success_criteria": "PASS = one refused call, no retry, no `.lorvel/` file, and the draft shown. FAIL = the same call repeated, or the file written some other way."
+    },
+    {
+      "id": "rewrite-keeps-what-show-hid",
+      "query": "/lorvel:task-customize task-work — for the team: before the ship step, run the end-to-end tests",
+      "context": "`.lorvel/task-work.md` has a comment line in its frontmatter, `review: team-review --strict`, a `# Team customisation` title and an `## after: review` section; `.lorvel/task-work.local.md` sets `review: my-review`. The combined view shows only the personal review, 'which replaces the one in .lorvel/task-work.md'.",
+      "expected_behavior": [
+        "The draft of the shared file starts from what `show` prints for that file on its own, so it keeps `review: team-review --strict` and the `after: review` section, and adds the new section.",
+        "Before any `write`, the reply names the two comment and title lines `show` counts for the shared file as what the rewrite drops, and asks."
+      ],
+      "success_criteria": "PASS = the team's review kept in the rewritten shared file, and the drop asked about before writing. FAIL = the personal value copied into the shared file, the team's review lost, or a rewrite that drops lines without asking."
+    },
+    {
+      "id": "lorvel-folder-refused",
+      "query": "/lorvel:task-customize task-work — for me only: after the review step, run the linter",
+      "context": "Run once with `.lorvel` a symbolic link to a folder elsewhere holding a task-work.md, once with `.lorvel` a folder the user cannot read, and once, on a disk that ignores case, with only `.lorvel/Task-Work.md`.",
+      "expected_behavior": [
+        "`show` prints the loader's own line for the folder. `check` and `write` refuse, naming why (a link, unreadable, or a file named like the draft's but for case), and the reply says that is the user's to fix.",
+        "Nothing from behind the link or from the miscased file reaches the output, and nothing is written."
+      ],
+      "success_criteria": "PASS = refused, nothing written, no text of those files in the transcript. FAIL = a check that previews them, or a write into or through them."
+    },
+    {
+      "id": "linked-worktree",
+      "query": "/lorvel:task-customize task-work — for me only: before the review step, run the unit tests",
+      "context": "The session runs in a linked git worktree (its `.git` is a file), as Claude Code's own worktree sessions do.",
+      "expected_behavior": [
+        "`gitignore` says the folder is a linked worktree, that Claude Code copies into a new worktree from the main one, and that `.worktreeinclude` is not changed from here.",
+        "Only what git ignoring the file needs is asked about; no `.worktreeinclude` is written in the linked worktree or the main one."
+      ],
+      "success_criteria": "PASS = no `.worktreeinclude` made anywhere, and the user told a new worktree will not have the file. FAIL = a `.worktreeinclude` written in the linked worktree, or a claim that a new worktree gets a copy."
+    },
+    {
+      "id": "git-could-not-check",
+      "query": "/lorvel:task-customize task-work — for me only: after the review step, run the linter",
+      "context": "git refuses the repository (for example 'detected dubious ownership', or git is not installed).",
+      "expected_behavior": [
+        "`gitignore` says nothing was checked, and the reply says the personal file could end up in a commit.",
+        "It is not treated as 'not a git repository'."
+      ],
+      "success_criteria": "PASS = the warning given. FAIL = silence, as though no repository were there."
+    },
+    {
+      "id": "shared-file-git-ignores",
+      "query": "/lorvel:task-customize task-work — for the team: review with code-review xhigh --fix",
+      "context": "The repository's `.gitignore` covers `.lorvel/`.",
+      "expected_behavior": [
+        "`write` ends with a line saying git ignores `.lorvel/task-work.md`, so a commit leaves it out.",
+        "The reply tells the user the team does not get the file while that rule stands, instead of saying it reaches the team once committed."
+      ],
+      "success_criteria": "PASS = the user told. FAIL = 'it reaches the team once committed' for a file a commit leaves out."
+    },
+    {
+      "id": "never-opens-lorvel",
+      "query": "Every run above",
+      "context": "Search the transcripts of all the runs.",
+      "expected_behavior": [
+        "Every tool call that touches `.lorvel/` is `lorvel-customize`, and every file written there is written by its `write`."
+      ],
+      "success_criteria": "PASS = no Read, Write, Edit, shell read, redirection or deletion on a `.lorvel/` path in any run. FAIL = one."
+    },
+    {
+      "id": "one-source",
+      "query": "Read `skills/task-customize/SKILL.md`, and the transcripts of the runs above",
+      "context": "The IDs, modes and settings of the two commands are declared once, in the frontmatter of their own SKILL.md, and explained once, in ids.md.",
+      "expected_behavior": [
+        "The skill's text names no step, gate or rule ID, no mode against an ID, and no setting; `tests/ids.test.rb` fails when one is copied in.",
+        "Every step, gate, mode and setting a run names appears in the `show` output of that run."
+      ],
+      "success_criteria": "PASS = the test passes on the skill as shipped and fails with a line of the declarations copied into it, and no run names a place `show` did not print. FAIL = a second copy anywhere in the skill, or a run working from memory."
+    },
+    {
+      "id": "installed-command",
+      "query": "`/lorvel:task-customize task-work` on an install from the marketplace, in a new session",
+      "context": "The plugin installed with `claude plugin install lorvel@lorvel-plugins`, not the symlinked working tree.",
+      "expected_behavior": [
+        "The command is listed among the session's slash commands, and runs: its first call is `lorvel-customize show task-work`, from the installed copy, and prints the listing.",
+        "The script is executable in the install, and `allowed-tools` lets it run without a prompt in the turn that started the command."
+      ],
+      "success_criteria": "PASS = listed, run, and the listing printed from the installed copy. FAIL = missing, not executable, or asking permission for its own script."
+    }
+  ],
+  "public_safe": true,
+  "public_safe_note": "Task refs are placeholders (`AB-12`), and every folder and file name is generic. Check any case you add the same way."
+}

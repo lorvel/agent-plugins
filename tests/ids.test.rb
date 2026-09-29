@@ -29,6 +29,8 @@ POINTER = {
 }
 
 $failures = 0
+# Every ID either command declares, for the check that task-customize carries no copy of them.
+ALL_IDS = []
 def fail(msg)
   $failures += 1
   puts "FAIL #{msg}"
@@ -71,6 +73,7 @@ end
   (fail("#{skill}: ids is not a list"); next) unless rows.is_a?(Array) && !rows.empty?
 
   ids = rows.map { |r| r["id"] }
+  ALL_IDS.concat(ids)
   dup = ids.select { |i| ids.count(i) > 1 }.uniq
   fail("#{skill}: duplicate IDs #{dup}") unless dup.empty?
   steps = rows.select { |r| r["kind"] == "step" }.map { |r| r["id"] }
@@ -173,9 +176,62 @@ end
   puts "#{skill}: #{rows.size} IDs, #{steps.size} steps, #{gate_ids.size} gates, #{locked.size} locked"
 end
 
+# task-customize writes the files the other two commands read, through scripts/lorvel-customize,
+# and is customised by nothing, so it declares no IDs. It runs only when typed, and the script is the
+# only command it pre-approves.
+CUSTOMIZE_RULE = 'Bash("${CLAUDE_PLUGIN_ROOT}/scripts/lorvel-customize" *)'
+CUSTOMIZE_CALL = %("${CLAUDE_PLUGIN_ROOT}/scripts/lorvel-customize" <verb> <command> … <<'LORVEL_INPUT'\n    ${CLAUDE_PROJECT_DIR}\n    LORVEL_INPUT\n)
+cdir = File.join(PLUGIN, "skills", "task-customize")
+ctext = File.exist?(File.join(cdir, "SKILL.md")) ? File.read(File.join(cdir, "SKILL.md")) : ""
+if (m = ctext.match(/\A---\n(.*?)\n---\n/m))
+  front = YAML.safe_load(m[1])
+  body = m.post_match
+  fail("task-customize: disable-model-invocation is #{front["disable-model-invocation"].inspect}") unless front["disable-model-invocation"] == true
+  fail("task-customize: allowed-tools is #{front["allowed-tools"].inspect}") unless front["allowed-tools"] == CUSTOMIZE_RULE
+  fail("task-customize: declares metadata") if front.key?("metadata")
+  fail("task-customize: runs a command before the model reads it") unless body.scan(/^[ \t]*```!/).empty? && body.scan(/(?:^|\s)!`[^`]+`/).empty?
+  fail("task-customize: does not give the script the folder in a quoted heredoc") unless body.include?(CUSTOMIZE_CALL)
+  fail("task-customize: lacks the never-open rule") unless body.include?("Never open a file in `.lorvel/` yourself")
+  fail("task-customize: body has $ARGUMENTS inside the script's command") if body =~ /lorvel-customize[^\n]*\$ARGUMENTS/
+
+  # One source: the steps, gates, rules and modes come from `show` at run time, so no text of this
+  # skill may hold a copy of them — no gate name, no ID written as code or after an operation, no
+  # line of the declarations or of what `show` prints. The script's own verbs are the exception:
+  # `write` is also a step of task-create.
+  verbs = %w[show check write gitignore]
+  shown_lines = %w[task-work task-create].flat_map do |cmd|
+    out, status = Open3.capture2({"LC_ALL" => "C", "LORVEL_SKILLMD" => File.join(PLUGIN, "skills", cmd, "SKILL.md"),
+                                  "LORVEL_IDSMD" => File.join(PLUGIN, "ids.md")},
+                                 "awk", "-v", "skill=#{cmd}", "-f", File.join(PLUGIN, "scripts", "lorvel-ids.awk"),
+                                 "-f", File.join(PLUGIN, "scripts", "lorvel-points.awk"), stdin_data: "")
+    fail("lorvel-points.awk failed for #{cmd}") unless status.success?
+    out.force_encoding("UTF-8").lines.map { |l| l.chomp.sub(/\A- /, "") }.select { |l| l.length >= 30 }
+  end.uniq
+  ids = ALL_IDS.uniq
+  id_re = ids.map { |i| Regexp.escape(i) }.join("|")
+  ([["SKILL.md", body]] + Dir[File.join(cdir, "reference", "*.md")].sort.map { |f| [File.basename(f), File.read(f)] }).each do |name, t|
+    t.scan(/`([^`\n]+)`/).flatten.each do |code|
+      fail("task-customize/#{name}: names the ID #{code} as code") if ids.include?(code) && !verbs.include?(code)
+    end
+    t.scan(/\b(?:before|after|replace|skip):[ \t]*(#{id_re})\b/).flatten.uniq.each { |id| fail("task-customize/#{name}: anchors a section at #{id}") }
+    t.scan(/\b(?:STOP|GATE)-\d+\b/).uniq.each { |g| fail("task-customize/#{name}: names #{g}") }
+    fail("task-customize/#{name}: holds a line of the declarations") if t =~ /\{\s*id:|\b(?:kind|mode):[ \t]*(?:step|gate|rule|locked|extend|replace|optional)\b/
+    t.scan(/^[ \t]*- (#{id_re}) \(/).flatten.uniq.each { |id| fail("task-customize/#{name}: holds the line show prints for #{id}") }
+    # Nor any line `show` prints for either command — steps, rules, the modes it quotes from ids.md,
+    # the settings — copied whole, or its part after a leading "- ".
+    shown_lines.each do |line|
+      fail("task-customize/#{name}: holds a line show prints: #{line[0, 60].inspect}") if t.include?(line)
+    end
+  end
+  puts "task-customize: no copy of the #{ids.size} IDs or of the #{shown_lines.size} lines show prints"
+else
+  fail("task-customize: no SKILL.md with frontmatter")
+end
+
 # POSIX awk refuses a function parameter named like a function, and gawk --posix enforces it; the
 # loader runs these files together.
-PROGRAMS = [%w[lorvel-token.awk lorvel-ids.awk lorvel-read.awk], %w[lorvel-ids.awk lorvel-sections.awk], %w[lorvel-token.awk lorvel-check.awk]]
+PROGRAMS = [%w[lorvel-token.awk lorvel-ids.awk lorvel-read.awk], %w[lorvel-ids.awk lorvel-sections.awk], %w[lorvel-token.awk lorvel-check.awk],
+            %w[lorvel-ids.awk lorvel-points.awk]]
 PROGRAMS.each do |files|
   srcs = files.map { |f| File.read(File.join(PLUGIN, "scripts", f)) }
   funcs = srcs.flat_map { |t| t.scan(/^function\s+(\w+)\s*\(/).flatten }
@@ -191,13 +247,17 @@ ids_md = File.read(File.join(PLUGIN, "ids.md"))
 ["- `locked` —", "- `extend` —", "- `replace` —", "- `optional` —", "`metadata.lorvel.ids`", "| `source` |"].each do |s|
   fail("ids.md lacks #{s}") unless ids_md.include?(s)
 end
-fail("scripts/lorvel-load is not executable") unless File.executable?(File.join(PLUGIN, "scripts", "lorvel-load"))
+%w[lorvel-load lorvel-customize].each do |script|
+  fail("scripts/#{script} is not executable") unless File.executable?(File.join(PLUGIN, "scripts", script))
+end
 fail("scripts/lorvel-load has no none= line") unless NONE
 # What an install gets is the mode git records, not this checkout's.
 repo = File.expand_path("..", __dir__)
 if system("git", "-C", repo, "rev-parse", "--git-dir", out: File::NULL, err: File::NULL)
-  mode = `git -C "#{repo}" ls-files -s plugins/lorvel/scripts/lorvel-load`[/\A\d+/]
-  fail("git records scripts/lorvel-load as #{mode.inspect}, not 100755") unless mode == "100755"
+  %w[lorvel-load lorvel-customize].each do |script|
+    mode = `git -C "#{repo}" ls-files -s plugins/lorvel/scripts/#{script}`[/\A\d+/]
+    fail("git records scripts/#{script} as #{mode.inspect}, not 100755") unless mode == "100755"
+  end
 end
 # The README states the cap on a file's sections; it has to be the one the loader applies.
 seccap = File.read(File.join(PLUGIN, "scripts", "lorvel-load.sh"))[/^seccap=(\d+)$/, 1]

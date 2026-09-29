@@ -183,6 +183,11 @@ check create-settings "$H$nl- after: write (Step 7) — from .lorvel/task-create
 
 d=$(folder create-empty); : > "$d/.lorvel/task-create.local.md"
 check create-empty "$H$nl- Nothing in .lorvel/task-create.local.md applies in this version" task-create "$d"
+# Named up to three, like unknown keys: however many a file holds, the line stays short, and the
+# output stays under what lorvel-load lets through.
+d=$(folder create-many-settings)
+{ printf -- '---\ndefaults:\n'; i=0; while [ $i -lt 3000 ]; do printf '  k%s: x\n' $i; i=$((i + 1)); done; printf -- '---\n'; } > "$d/.lorvel/task-create.md"
+check create-many-settings "$H$nl- Not applied: defaults.k0, defaults.k1, defaults.k2 and 2997 more in .lorvel/task-create.md — not a setting of task-create in this version" task-create "$d"
 
 # --- what a file says that this version does not apply -----------------------------------------
 
@@ -198,6 +203,13 @@ one unknown-keys '---\nreviw: code-review\nmodels:\n  review: haiku\ndefaults:\n
 MARK=Zq8fK2mP0xY7rT4wN1vB6cD3
 one unknown-key-not-echoed '---\nZq8fK2mP0xY7rT4wN1vB6cD3: 1\n---\n' '- Not applied: unknown key on line 2 in .lorvel/task-work.md'
 one nothing-applies '---\nschema: 1\nskill: lorvel:task-work\n---\n' '- Nothing in .lorvel/task-work.md applies in this version'
+# One `# Title` line may open the body; more text before the first section, titles included, is
+# said to be not applied rather than dropped without a word.
+one one-title '---\nschema: 1\n---\n\n# Team customisation\n\n## after: review\n\nx\n' \
+  "- after: review (Phase 4) — from .lorvel/task-work.md:$nl  > x$nl$SECT_TW"
+MARK=MARKER_TITLE
+one two-titles '---\nschema: 1\n---\n\n# Team customisation\n# MARKER_TITLE: never push on a Friday\n\n## after: review\n\nx\n' \
+  "- after: review (Phase 4) — from .lorvel/task-work.md:$nl  > x$nl- Not applied: the text before the first section of .lorvel/task-work.md — only sections apply$nl$SECT_TW"
 
 # --- sections -----------------------------------------------------------------------------------
 # Each applies at the ID it names, in the order the command reaches them, and only as that ID's
@@ -480,6 +492,40 @@ ln -s "$work/shared/.lorvel-target" "$d/.lorvel"
 MARK=MARKER_REFUSED; check folder-link "$H$nl- Not applied: .lorvel/ — it is a symbolic link, and only a real folder in the session folder is read" task-work "$d"
 d=$(folder directory); mkdir "$d/.lorvel/task-work.md"
 check directory "$H$nl- Not applied: all of .lorvel/task-work.md — it is not a regular file" task-work "$d"
+# A file refused before it is read is still reported when the other file has a section to apply.
+d=$(folder link-and-personal-section); ln -s "$work/elsewhere.md" "$d/.lorvel/task-work.md"
+printf -- '## after: review\n\nMine.\n' > "$d/.lorvel/task-work.local.md"
+MARK=MARKER_REFUSED; check link-and-personal-section "$H$nl- after: review (Phase 4) — from .lorvel/task-work.local.md:$nl  > Mine.$nl- Not applied: all of .lorvel/task-work.md — it is a symbolic link$nl$SECT_TW" task-work "$d"
+d=$(folder invisible-and-shared-section)
+printf -- '## after: context\n\nShared.\n' > "$d/.lorvel/task-create.md"
+printf -- '## after: context\n\nMARKER_REFUSED\342\200\213\n' > "$d/.lorvel/task-create.local.md"
+MARK=MARKER_REFUSED; check invisible-and-shared-section "$H$nl- after: context (Step 4) — from .lorvel/task-create.md:$nl  > Shared.$nl- Not applied: all of .lorvel/task-create.local.md — $INV (line 3)$nl$SECT_TC" task-create "$d"
+
+# --- the verdict on a draft (LORVEL_CUSTOMIZE_DRAFT, set by lorvel-customize) ---------------------
+# One line first, from what was refused in that file, never from how it is worded.
+
+draft() {
+  LORVEL_CUSTOMIZE_DRAFT=$1
+  export LORVEL_CUSTOMIZE_DRAFT
+  check "$2" "$3" "$4" "$5"
+  unset LORVEL_CUSTOMIZE_DRAFT
+}
+d=$(folder draft-clean)
+printf -- '---\nreview: code-review\n---\n\n## after: review\n\nx\n' > "$d/.lorvel/task-work.md"
+draft task-work.md draft-clean "$H$nl- Draft .lorvel/task-work.md: applies in full$nl- review: code-review — from .lorvel/task-work.md$nl- after: review (Phase 4) — from .lorvel/task-work.md:$nl  > x$nl$SECT_TW" task-work "$d"
+d=$(folder draft-section-refused)
+printf -- '## after: review\n\nx\n\n## skip: STOP-1\n' > "$d/.lorvel/task-work.md"
+draft task-work.md draft-section-refused "$H$nl- Draft .lorvel/task-work.md: does not apply in full$nl- after: review (Phase 4) — from .lorvel/task-work.md:$nl  > x$nl- Not applied: skip: STOP-1 in .lorvel/task-work.md — STOP-1 is locked: only an optional step can be skipped$nl$SECT_TW" task-work "$d"
+d=$(folder draft-other-refused)
+printf -- '---\nreview: code-review --auto\n---\n' > "$d/.lorvel/task-work.md"
+printf -- '## after: review\n\nMine.\n' > "$d/.lorvel/task-work.local.md"
+draft task-work.local.md draft-other-refused "$H$nl- Draft .lorvel/task-work.local.md: applies in full$nl- after: review (Phase 4) — from .lorvel/task-work.local.md:$nl  > Mine.$nl- Not applied: review in .lorvel/task-work.md — it would start another command$nl$SECT_TW" task-work "$d"
+d=$(folder draft-refused-whole); printf 'x\342\200\213\n' > "$d/.lorvel/task-create.local.md"
+draft task-create.local.md draft-refused-whole "$H$nl- Draft .lorvel/task-create.local.md: does not apply in full$nl- Not applied: all of .lorvel/task-create.local.md — $INV (line 1)" task-create "$d"
+d=$(folder draft-missing); printf -- '---\nreview: code-review\n---\n' > "$d/.lorvel/task-work.local.md"
+draft task-work.md draft-missing "$H$nl- Draft .lorvel/task-work.md: does not apply in full$nl- review: code-review — from .lorvel/task-work.local.md" task-work "$d"
+d=$(folder draft-not-a-layer); printf -- '---\nreview: code-review\n---\n' > "$d/.lorvel/task-work.md"
+draft notes.md draft-not-a-layer "$H$nl- Draft .lorvel/notes.md: does not apply in full$nl- review: code-review — from .lorvel/task-work.md" task-work "$d"
 if command -v mkfifo >/dev/null 2>&1; then
   d=$(folder fifo); mkfifo "$d/.lorvel/task-work.md"
   check fifo "$H$nl- Not applied: all of .lorvel/task-work.md — it is not a regular file" task-work "$d"

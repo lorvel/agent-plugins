@@ -2,7 +2,7 @@
 
 `task-create` and `task-work` each declare their steps, gates and locked rules in the frontmatter of their `SKILL.md`, under `metadata.lorvel.ids`: steps and gates in the order they run, then the rules. That list is the contract a customisation of a command anchors to, and this file is the one place its fields and modes are defined.
 
-The loader, `scripts/lorvel-load`, reads it: it checks each section of a customisation against the mode of the ID the section names, prints a step's label next to its sections, and hands the model the locked IDs along with them. The list itself costs a run nothing — Claude Code keeps `metadata` on the loaded skill but shows the model none of it, not when a command runs and not in the list of skills it can call (checked on Claude Code 2.1.283). Only what the loader prints from it for a customisation reaches the model.
+The loader, `scripts/lorvel-load`, reads it: it checks each section of a customisation against the mode of the ID the section names, prints a step's label next to its sections, and hands the model the locked IDs along with them. `scripts/lorvel-customize`, which `/lorvel:task-customize` runs, reads it too: it lists each ID with the sections it takes, asking the function the loader checks sections with, so the two cannot disagree. The list itself costs a run nothing — Claude Code keeps `metadata` on the loaded skill but shows the model none of it, not when a command runs and not in the list of skills it can call (checked on Claude Code 2.1.283). While `/lorvel:task-work` or `/lorvel:task-create` runs, only what the loader prints from it for a customisation reaches the model; `/lorvel:task-customize` shows its model the list itself, through `lorvel-customize show`.
 
 The loader reads the list in the two shapes the skills write it in — a one-line flow map for a step or a gate, a block map for a rule — and `tests/ids.test.rb` checks that it reads what a YAML parser reads.
 
@@ -34,7 +34,7 @@ A customisation is a file under `.lorvel/`; each section of its body names one I
 
 Text counts as what it does, wherever it is anchored: text that stops an ID from running skips it, text that runs something else in its place replaces it, and text that makes it do less weakens it.
 
-A reader can check each section's operation against the mode of the ID it names. Whether a text skips, replaces or weakens something is a judgement only the model can make, and the model never sees this file or the declarations — so whatever applies a customisation hands the model these rules along with it.
+A reader can check each section's operation against the mode of the ID it names. Whether a text skips, replaces or weakens something is a judgement only the model can make, and the model running `/lorvel:task-work` or `/lorvel:task-create` never sees this file or the declarations — so whatever applies a customisation hands the model these rules along with it. The model writing one, in `/lorvel:task-customize`, gets them from `lorvel-customize show`, which quotes the modes above and the paragraph after them.
 
 ## Changing the declarations
 

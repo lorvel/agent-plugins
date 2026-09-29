@@ -50,9 +50,11 @@ function unknown(k) {
   else unknown_item[n_unknown] = "on line " NR
 }
 
+# A key this command does not take. Named up to three, like unknown keys, so that no file can push
+# the output past what lorvel-load lets through and turn customisation off.
 function notfor(k) {
   n_notfor++
-  notfor_names = notfor_names (n_notfor > 1 ? ", " : "") k
+  if (n_notfor <= 3) notfor_names = notfor_names (n_notfor > 1 ? ", " : "") k
 }
 
 function top(key, val) {
@@ -191,8 +193,14 @@ function body_line(l) {
     sec_line[ns, ++sec_n[ns]] = l
     return
   }
-  # Text before the first section; blank lines and a `# Title` line are let through.
-  if (l ~ /^[ \t]*$/ || l ~ /^#[ \t]/) return
+  # Text before the first section: blank lines, and one `# Title` line opening the body, are let
+  # through; anything else is text no section applies, and is said to be.
+  if (l ~ /^[ \t]*$/) return
+  if (l ~ /^#[ \t]/ && !pre_seen) {
+    pre_seen = 1
+    return
+  }
+  pre_seen = 1
   pre_lines++
   if (!had_front && l ~ /^(---|[A-Za-z0-9_-]+:([ \t]|$))/) keyish = 1
 }
@@ -205,7 +213,7 @@ function sec_refuse(s, op, id, why) {
   else print "LINE - Not applied: the section on line " sec_nr[s] " of " shown " — " why
 }
 
-function section(s,    h, op, id, i, mode, first, last, m, l, lv, key) {
+function section(s,    h, op, id, i, why, first, last, m, l, lv, key) {
   h = sec_head[s]
   sub(/[ \t]+$/, "", h)
   if (h !~ /^##[ \t]+(before|after|replace|skip):[ \t]*[^ \t]+$/) {
@@ -223,45 +231,19 @@ function section(s,    h, op, id, i, mode, first, last, m, l, lv, key) {
     return
   }
   i = ids_at[id]
-  mode = ids_mode[i]
   first = 0; last = 0
   for (m = 1; m <= sec_n[s]; m++) {
     if (sec_line[s, m] ~ /^[ \t]*$/) continue
     if (!first) first = m
     last = m
   }
-  if (layer && (op == "replace" || op == "skip")) {
-    sec_refuse(s, op, id, "a personal file can only add steps, with before: and after:")
+  # What the ID's mode and kind, and the file's layer, allow: see ids_refusal in lorvel-ids.awk.
+  why = ids_refusal(skill, i, op, layer, !first)
+  if (why != "") {
+    sec_refuse(s, ids_op, id, why)
     return
   }
-  if (op == "replace" && !first) {
-    # An empty replace takes the step away: a skip, allowed only where a skip is.
-    if (mode != "optional") {
-      sec_refuse(s, op, id, "it has no text, which would skip " id ", and " id " is " mode ": only an optional step can be skipped")
-      return
-    }
-    op = "skip"
-  }
-  if (op == "skip" && mode != "optional") {
-    sec_refuse(s, op, id, id " is " mode ": only an optional step can be skipped")
-    return
-  }
-  if (op == "replace" && mode != "replace" && mode != "optional") {
-    sec_refuse(s, op, id, id " is " mode ": only a step marked replace can be replaced")
-    return
-  }
-  if (ids_kind[i] == "rule") {
-    sec_refuse(s, op, id, id " is a rule: it holds for the whole run, so it is no step to add to, replace or skip")
-    return
-  }
-  if (skill == "task-create" && op == "before" && (id == "intake" || id == "GATE-1")) {
-    sec_refuse(s, op, id, "task-create reads this file after the checks of step 1, too late for this")
-    return
-  }
-  if (!first && op != "skip") {
-    sec_refuse(s, op, id, "it has no text")
-    return
-  }
+  op = ids_op
   for (m = first; first && m <= last; m++) {
     l = tolower(sec_line[s, m])
     if (l ~ /(^|[^a-z0-9_.-])[.]lorvel([^a-z0-9_-]|$)/) lv = 1
@@ -376,7 +358,7 @@ END {
     said = 1
   }
   if (n_notfor) {
-    print "LINE - Not applied: " notfor_names " in " shown " — not a setting of " skill " in this version"
+    print "LINE - Not applied: " notfor_names (n_notfor > 3 ? " and " (n_notfor - 3) " more" : "") " in " shown " — not a setting of " skill " in this version"
     said = 1
   }
   if (n_unknown) {

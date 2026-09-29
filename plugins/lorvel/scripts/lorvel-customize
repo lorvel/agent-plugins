@@ -1,0 +1,338 @@
+#!/bin/sh
+# lorvel-customize show <task-work|task-create>
+# lorvel-customize check <task-work|task-create> <shared|personal>
+# lorvel-customize write <task-work|task-create> <shared|personal> <new|replace>
+# lorvel-customize gitignore <task-work|task-create> [add]
+#
+# What /lorvel:task-customize runs. The first line of standard input names the folder this session
+# was opened in. For check and write, the rest of it is the whole file to write, from the --- line
+# that opens its frontmatter.
+#
+# show       Where a customisation of the command can act (lorvel-points.awk); what applies now,
+#            as the loader prints it for the session folder; when both files exist, what each
+#            applies on its own; and for each file, how many comment or title lines no view prints.
+# check      Runs the loader with the draft in place of that file — in a scratch folder beside the
+#            other file as the loader finds it — and passes on its verdict: whether the draft
+#            applies in full, worked out from what the loader refused, not from how it words it.
+# write      The same check; only when the draft applies in full, puts it in .lorvel/ — new refuses
+#            to overwrite a file, replace refuses to create one — then prints the loader's output
+#            for the session folder.
+# gitignore  For the personal file: whether git ignores it, and whether .worktreeinclude has new
+#            worktrees copy it. With add, adds to both what is missing.
+#
+# check and write look at .lorvel/ as the loader does: a folder that is a link, is not a folder or
+# cannot be read holds nothing the loader reads, and only files named exactly as the loader names
+# them count — on a disk that ignores case, Task-Work.md is not task-work.md.
+# Text from a .lorvel/ file reaches the output only through the loader, which checks it first; the
+# lines of this script are fixed. Always exits 0: what went wrong is a line of the output.
+
+set -u
+set -f
+LC_ALL=C
+export LC_ALL
+
+stop() {
+  printf '%s\n' "$1"
+  exit 0
+}
+
+here=$(cd "$(dirname "$0")" 2>/dev/null && pwd) || stop "- lorvel-customize could not find its own folder, so it did nothing."
+
+case $#:${1-}:${3-}:${4-} in
+  2:show::|2:gitignore::|3:gitignore:add:|3:check:shared:|3:check:personal:) ;;
+  4:write:shared:new|4:write:shared:replace|4:write:personal:new|4:write:personal:replace) ;;
+  *) stop "- lorvel-customize takes show <command>, check <command> shared|personal, write <command> shared|personal new|replace, or gitignore <command> [add]; it did nothing." ;;
+esac
+verb=$1
+skill=$2
+case $skill in
+  task-work|task-create) ;;
+  *) stop "- lorvel-customize works on task-work and task-create only, so it did nothing." ;;
+esac
+
+folder=''
+IFS= read -r folder 2> /dev/null || :
+[ -d "$folder" ] || stop "- The first line of the input names no folder, so nothing was done."
+case $verb in
+  show|gitignore)
+    if IFS= read -r more 2> /dev/null; then
+      stop "- The name of the session folder has a line break in it, so nothing was read."
+    fi ;;
+esac
+dir=$folder/.lorvel
+personal=$skill.local.md
+
+# One scratch folder for everything this run makes outside .lorvel/, and the one write makes inside
+# it; both go however the script ends.
+S=$(mktemp -d "${TMPDIR:-/tmp}/lorvel-customize.XXXXXX") && [ -d "$S" ] || stop "- No scratch folder could be made, so nothing was done."
+T=''
+cleanup() {
+  rm -rf "$S"
+  [ -z "$T" ] || rm -rf "$T"
+}
+trap cleanup EXIT
+trap 'cleanup; exit 0' HUP INT TERM
+
+# listed <folder> <name>: the folder holds an entry named exactly <name>, as the loader finds it.
+listed() {
+  [ -n "$(find "$1/." ! -name . -prune -name "$2" -print 2>/dev/null)" ]
+}
+
+# Why .lorvel/ holds nothing the loader reads, in the loader's words, or nothing when it may.
+folder_refusal() {
+  if [ -L "$dir" ]; then
+    echo "it is a symbolic link, and only a real folder in the session folder is read"
+  elif [ -e "$dir" ] && [ ! -d "$dir" ]; then
+    echo "it is not a folder"
+  elif [ -d "$dir" ] && { [ ! -r "$dir" ] || [ ! -x "$dir" ]; }; then
+    echo "the folder cannot be read"
+  fi
+}
+
+# place <name> <scratch .lorvel>: puts in the scratch folder what the loader finds as <name> in the
+# session folder. It refuses a link or anything but a regular file without reading it, so those
+# are stood in for by a link to nowhere and a folder; cp would follow a link.
+place() {
+  if [ -L "$dir/$1" ]; then
+    ln -s /nonexistent "$2/$1"
+  elif [ ! -f "$dir/$1" ]; then
+    mkdir "$2/$1"
+  elif ! cp "$dir/$1" "$2/$1" 2>/dev/null; then
+    # Not readable: so the loader says.
+    : > "$2/$1" && chmod 000 "$2/$1"
+  fi
+}
+
+# The loader's output for a folder; it always prints something and exits 0.
+loader() {
+  sh "$here/lorvel-load" "$skill" "$1" < /dev/null
+}
+
+if [ "$verb" = show ]; then
+  LORVEL_SKILLMD=$here/../skills/$skill/SKILL.md
+  LORVEL_IDSMD=$here/../ids.md
+  export LORVEL_SKILLMD LORVEL_IDSMD
+  points=$(awk -v skill="$skill" -f "$here/lorvel-ids.awk" -f "$here/lorvel-points.awk" < /dev/null 2>/dev/null) ||
+    stop "- The steps of $skill could not be read from its SKILL.md, so it cannot be customised from here."
+  printf '%s\n' "$points"
+  printf '%s\n' "What applies now: a run of $skill in this folder starts with these lines."
+  loader "$folder"
+  [ -z "$(folder_refusal)" ] && [ -d "$dir" ] || exit 0
+  both=no
+  listed "$dir" "$skill.md" && listed "$dir" "$personal" && both=yes
+  for n in "$skill.md" "$personal"; do
+    listed "$dir" "$n" && [ -f "$dir/$n" ] && [ ! -L "$dir/$n" ] && [ -r "$dir/$n" ] || continue
+    # With both files there, the lines above show only the review that wins; a rewrite of either
+    # file starts from what it applies on its own.
+    if [ "$both" = yes ]; then
+      v=$S/$n
+      mkdir "$v" "$v/.lorvel" && place "$n" "$v/.lorvel" || stop "- A scratch copy of .lorvel/$n could not be made."
+      printf '%s\n' "What .lorvel/$n applies on its own:"
+      loader "$v"
+    fi
+    # Comments in the frontmatter, and a title line, which no view prints and a rewrite does not keep.
+    kept=$(awk '
+      NR == 1 && /^---[ \t]*$/ { front = 1; next }
+      front && /^---[ \t]*$/ { front = 0; next }
+      front { if ($0 ~ /^[ \t]*#/ || $0 ~ /[ \t]#/) n++; next }
+      /^ *##([ \t]|$)/ { exit }
+      /^#[ \t]/ { n++ }
+      END { print n + 0 }' "$dir/$n" 2>/dev/null)
+    case $kept in
+      ''|0) ;;
+      1) printf '%s\n' "- .lorvel/$n also holds 1 comment or title line, which no view prints and a rewrite of it drops." ;;
+      *) printf '%s\n' "- .lorvel/$n also holds $kept comment or title lines, which no view prints and a rewrite of it drops." ;;
+    esac
+  done
+  exit 0
+fi
+
+if [ "$verb" = gitignore ]; then
+  shown=.lorvel/$personal
+  cannot="Not checked: nothing tells whether $shown would be committed, so it could end up in a commit; say so."
+  command -v git > /dev/null 2>&1 || stop "- git is not installed here. $cannot"
+  if ! root=$(git -C "$folder" rev-parse --show-toplevel 2>/dev/null) || [ -z "$root" ]; then
+    case $(git -C "$folder" rev-parse --show-toplevel 2>&1 > /dev/null) in
+      *'not a git repository'*)
+        stop "- The session folder is not in a git repository: there is nothing to keep out of commits, and nothing to ask." ;;
+      *) stop "- git could not read the repository the session folder is in. $cannot" ;;
+    esac
+  fi
+  prefix=$(git -C "$folder" rev-parse --show-prefix 2>/dev/null) || stop "- git could not say where the session folder sits in its repository. $cannot"
+  # "./" first: git takes a path starting with ":" as pathspec magic.
+  rel=./$prefix.lorvel/$personal
+  wti=$root/.worktreeinclude
+  # In a linked worktree, Claude Code copies into a new worktree from the main one, not from here.
+  linked=no
+  gd=$(cd "$folder" && cd "$(git rev-parse --git-dir)" && pwd -P) &&
+    cd_=$(cd "$folder" && cd "$(git rev-parse --git-common-dir)" && pwd -P) &&
+    [ "$gd" != "$cd_" ] && linked=yes
+
+  # facts: sets tracked, ignored and listed for the personal file.
+  facts() {
+    tracked=no
+    GIT_LITERAL_PATHSPECS=1 git -C "$root" ls-files --error-unmatch -- "$rel" > /dev/null 2>&1 && tracked=yes
+    git -C "$root" check-ignore -q --no-index -- "$rel" 2>/dev/null
+    case $? in
+      0) ignored=yes ;;
+      1) ignored=no ;;
+      *) stop "- git could not say whether it ignores $shown. $cannot" ;;
+    esac
+    # .worktreeinclude takes gitignore patterns, so git's own matcher answers, in a scratch
+    # repository whose only rules are that file's: no template, no global excludes.
+    listed=no
+    if [ "$linked" = no ] && [ -f "$wti" ]; then
+      t=$S/worktreeinclude
+      rm -rf "$t"
+      if git init -q --template= "$t" > /dev/null 2>&1 && cp "$wti" "$t/.gitignore" &&
+        git -C "$t" -c core.excludesFile=/dev/null check-ignore -q --no-index -- "$rel" 2>/dev/null; then
+        listed=yes
+      fi
+    fi
+  }
+
+  report() {
+    if [ "$tracked" = yes ]; then
+      printf '%s\n' "- $shown is tracked by git, so no ignore rule keeps it out of commits, and every worktree gets it from the commit; untracking it (git rm --cached) is the user's call."
+      return
+    fi
+    if [ "$ignored" = yes ]; then
+      printf '%s\n' "- git ignores $shown."
+    else
+      printf '%s\n' "- git does not ignore $shown: committing the folder would commit it."
+    fi
+    if [ "$linked" = yes ]; then
+      printf '%s\n' "- The session folder is in a linked worktree. Claude Code copies files into a new worktree from the main one, not from here, so this file reaches no new worktree; .worktreeinclude is not changed from here."
+    elif [ "$listed" = yes ] && [ "$ignored" = yes ]; then
+      printf '%s\n' "- .worktreeinclude lists it, so a new worktree of this repository gets a copy."
+    elif [ "$listed" = yes ]; then
+      printf '%s\n' "- .worktreeinclude lists it, but a new worktree gets only files git ignores, so while git does not ignore it, a new worktree starts without it."
+    else
+      printf '%s\n' "- .worktreeinclude does not list it, so a new worktree of this repository starts without it."
+    fi
+  }
+
+  # append <file> <line>: adds a line, first ending the last one if the file does not.
+  append() {
+    if [ -s "$1" ] && [ -n "$(tail -c 1 "$1")" ]; then
+      printf '\n' >> "$1" || return 1
+    fi
+    printf '%s\n' "$2" >> "$1"
+  }
+
+  facts
+  if [ "${3-}" = add ] && [ "$tracked" = no ]; then
+    if [ "$ignored" = no ]; then
+      if [ -L "$folder/.gitignore" ]; then
+        printf '%s\n' "- .gitignore was not changed: in the session folder it is a symbolic link, which git does not read. A real .gitignore there, holding the line .lorvel/*.local.md, is for the user to make."
+      elif append "$folder/.gitignore" '.lorvel/*.local.md'; then
+        printf '%s\n' "- Added .lorvel/*.local.md to .gitignore in the session folder."
+      else
+        printf '%s\n' "- .gitignore could not be written."
+      fi
+    fi
+    if [ "$linked" = no ] && [ "$listed" = no ]; then
+      case $prefix in
+        *[!A-Za-z0-9._/@+,-]*)
+          printf '%s\n' "- .worktreeinclude was not changed: the session folder's path in the repository has characters a pattern would have to escape, so the line for its .lorvel/*.local.md is for the user to add by hand." ;;
+        *)
+          if [ -L "$wti" ]; then
+            printf '%s\n' "- .worktreeinclude was not changed: it is a symbolic link. The line to add by hand, at the root of the repository, is $prefix.lorvel/*.local.md"
+          elif append "$wti" "$prefix.lorvel/*.local.md"; then
+            printf '%s\n' "- Added $prefix.lorvel/*.local.md to .worktreeinclude at the root of the repository."
+          else
+            printf '%s\n' "- .worktreeinclude could not be written."
+          fi ;;
+      esac
+    fi
+    facts
+  fi
+  report
+  exit 0
+fi
+
+# check and write: the draft.
+case $3 in
+  shared) name=$skill.md other=$personal ;;
+  personal) name=$personal other=$skill.md ;;
+esac
+shown=.lorvel/$name
+target=$dir/$name
+case $verb in
+  check) Not='Not checked' ;;
+  write) Not='Not written' ;;
+esac
+why=$(folder_refusal)
+[ -z "$why" ] || stop "- $Not: .lorvel/ in the session folder — $why. That is the user's to fix first."
+exists=no
+if [ -d "$dir" ]; then
+  if listed "$dir" "$name"; then
+    exists=yes
+  elif [ -e "$target" ] || [ -L "$target" ]; then
+    stop "- $Not: .lorvel/ holds a file named like $name but for upper and lower case, which the loader never reads; renaming or removing it is the user's to do first."
+  fi
+fi
+if [ "$verb" = write ]; then
+  if [ "$exists" = yes ] && { [ -L "$target" ] || [ ! -f "$target" ]; }; then
+    stop "- $Not: $shown is a symbolic link or not a regular file, which the loader refuses; it is not replaced from here — removing it is the user's to do."
+  fi
+  [ "$4" = new ] && [ "$exists" = yes ] &&
+    stop "- $Not: $shown already exists. Rewriting it is replace, once the user has agreed to what a rewrite drops."
+  [ "$4" = replace ] && [ "$exists" = no ] &&
+    stop "- $Not: $shown does not exist yet, so it is new."
+fi
+
+# The line after the folder opens the draft's frontmatter; anything else there is the rest of a
+# folder name with a line break in it, or no draft at all.
+IFS= read -r first 2> /dev/null || first=''
+case $first in
+  ---|'--- '*|'---	'*) ;;
+  *) stop "- $Not: the draft must start with the --- line that opens its frontmatter, on the line after the session folder." ;;
+esac
+s=$S/draft
+mkdir "$s" "$s/.lorvel" && { printf '%s\n' "$first"; cat; } > "$s/.lorvel/$name" || stop "- $Not: the draft could not be put in a scratch folder."
+if [ -d "$dir" ] && listed "$dir" "$other"; then
+  place "$other" "$s/.lorvel"
+fi
+# The loader's first line after its header is its verdict on the draft. The variable goes on the
+# command itself: set before a function call, a shell need not pass it on.
+out=$(LORVEL_CUSTOMIZE_DRAFT=$name sh "$here/lorvel-load" "$skill" "$s" < /dev/null)
+case $(printf '%s\n' "$out" | sed -n 2p) in
+  "- Draft $shown: applies in full") clean=yes ;;
+  "- Draft $shown: does not apply in full") clean=no ;;
+  *) clean=unknown ;;
+esac
+view=$(printf '%s\n' "$out" | awk 'NR == 2 && index($0, "- Draft ") == 1 { next } { print }')
+
+case $verb:$clean in
+  check:yes)
+    stop "- Checked: the loader applies all of the draft for $shown. With it in place, a run of $skill starts with these lines.
+$view" ;;
+  check:no)
+    stop "- Not clean: the loader does not apply all of the draft for $shown, so it cannot be written as it is. With it in place, a run of $skill would start with these lines.
+$view" ;;
+  write:no)
+    stop "- $Not: the loader does not apply all of the draft for $shown, so it cannot be written as it is. With it in place, a run of $skill would start with these lines.
+$view" ;;
+  *:unknown)
+    stop "- $Not: the loader gave no verdict on the draft for $shown, so it cannot be written; what it printed follows.
+$view" ;;
+esac
+
+# write, clean: into a folder of its own in .lorvel/, made fresh, then moved into place.
+if [ ! -d "$dir" ]; then
+  mkdir "$dir" || stop "- $Not: .lorvel could not be made in the session folder."
+fi
+T=$(mktemp -d "$dir/.lorvel-customize.XXXXXX") && [ -d "$T" ] || { T=''; stop "- $Not: no temporary folder could be made in .lorvel/."; }
+if ! { cp "$s/.lorvel/$name" "$T/$name" && mv -f "$T/$name" "$target"; }; then
+  stop "- $Not: $shown could not be written."
+fi
+printf '%s\n' "- Written: $shown. A run of $skill in this folder now starts with these lines."
+loader "$folder"
+# A shared file git ignores never reaches the team through a commit.
+if [ "$3" = shared ] && command -v git > /dev/null 2>&1 &&
+  git -C "$folder" rev-parse --is-inside-work-tree > /dev/null 2>&1 &&
+  git -C "$folder" check-ignore -q --no-index -- "./.lorvel/$name" 2>/dev/null; then
+  printf '%s\n' "- git ignores $shown here, so a commit leaves it out, and the team does not get it while that rule stands."
+fi
+exit 0

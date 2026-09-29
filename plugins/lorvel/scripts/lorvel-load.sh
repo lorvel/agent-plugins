@@ -7,6 +7,10 @@
 # section applies, the "Sections:" line last. Nothing from a file reaches the output unless it
 # passed every check: a file refused as a whole leaves one line naming it and the reason, never its
 # text.
+#
+# LORVEL_CUSTOMIZE_DRAFT, set by lorvel-customize to one of the two file names, adds a first line
+# saying whether that file applies in full: worked out from what was refused in it, never from how
+# the refusals are worded.
 # May exit non-zero on something unexpected; lorvel-load turns that into "customisation is off".
 
 set -u
@@ -27,24 +31,43 @@ LORVEL_SKILLMD=$here/../skills/$skill/SKILL.md
 export LORVEL_SKILLMD
 nl='
 '
+draft=${LORVEL_CUSTOMIZE_DRAFT-}
+draft_seen='' draft_bad=''
 
 listed() {
   [ -n "$(find "$1/." ! -name . -prune -name "$2" -print 2>/dev/null)" ]
 }
 
+# draft_line: the line for a draft, when one is being checked. It applies in full only when it was
+# read, and nothing in it was refused.
+draft_line() {
+  [ -n "$draft" ] || return 0
+  if [ -n "$draft_seen" ] && [ -z "$draft_bad" ]; then
+    printf '%s\n' "- Draft .lorvel/$draft: applies in full"
+  else
+    printf '%s\n' "- Draft .lorvel/$draft: does not apply in full"
+  fi
+}
+
 if [ -L "$dir" ]; then
+  draft_line
   printf '%s\n' "- Not applied: .lorvel/ — it is a symbolic link, and only a real folder in the session folder is read"
   exit 0
 fi
 if [ ! -r "$dir" ] || [ ! -x "$dir" ]; then
+  draft_line
   printf '%s\n' "- Not applied: .lorvel/ — the folder cannot be read"
   exit 0
 fi
 
-review='' review_from='' review_over='' plan_from='' notes='' secs='' recs=''
+# Everything to print after the settings, as the records lorvel-sections.awk reads: a section's
+# SEC and TXT lines, and a NOTE for each line saying what was not applied. One list, so that no
+# note can be printed in one case and lost in another.
+review='' review_from='' review_over='' plan_from='' recs=''
 
 for name in "$skill.md" "$skill.local.md"; do
   listed "$dir" "$name" || continue
+  [ "$name" = "$draft" ] && draft_seen=1
   f=$dir/$name
   shown=.lorvel/$name
   refuse=''
@@ -67,7 +90,8 @@ for name in "$skill.md" "$skill.local.md"; do
     esac
   fi
   if [ -n "$refuse" ]; then
-    notes="$notes- Not applied: all of $shown — $refuse$nl"
+    recs="${recs}NOTE - Not applied: all of $shown — $refuse$nl"
+    [ "$name" = "$draft" ] && draft_bad=1
     continue
   fi
 
@@ -84,15 +108,18 @@ for name in "$skill.md" "$skill.local.md"; do
         review_from=$shown
         ;;
       PLAN) plan_from=${plan_from:+$plan_from and }$shown ;;
-      'LINE '*) notes="$notes${r#LINE }$nl" recs="${recs}NOTE ${r#LINE }$nl" ;;
-      'SEC '*) secs=1 recs="$recs$r$nl" ;;
-      'TXT '*) recs="$recs$r$nl" ;;
+      'LINE '*)
+        recs="${recs}NOTE ${r#LINE }$nl"
+        [ "$name" = "$draft" ] && draft_bad=1
+        ;;
+      'SEC '*|'TXT '*) recs="$recs$r$nl" ;;
       *) exit 1 ;;
     esac
   done
   IFS=$old_ifs
 done
 
+draft_line
 if [ -n "$review" ]; then
   if [ -n "$review_over" ]; then
     printf '%s\n' "- review: $review — from $review_from, which replaces the one in $review_over"
@@ -103,10 +130,6 @@ fi
 if [ -n "$plan_from" ]; then
   printf '%s\n' "- STOP-2 on by default — defaults.plan: true in $plan_from; typing --no-plan turns it off for one run"
 fi
-if [ -z "$secs" ]; then
-  printf '%s' "$notes"
-  exit 0
-fi
-# The sections, then the notes, then the "Sections:" line.
+# The sections, then the notes, then the "Sections:" line when a section applies.
 out=$(printf '%s' "$recs" | awk -v skill="$skill" -f "$here/lorvel-ids.awk" -f "$here/lorvel-sections.awk") || exit 1
-printf '%s\n' "$out"
+[ -z "$out" ] || printf '%s\n' "$out"

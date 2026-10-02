@@ -1,6 +1,6 @@
 {
   "command": "lorvel:task-plan",
-  "note": "These criteria were written BEFORE the command body, from its definition of done, so they describe what the command should do rather than what it happens to do. Same shape and same caveats as task-create.json: read them by hand, and see its `runner` note for why this is not the shape `claude plugin eval` executes. \"The planning method\" in them is the one file every command of this plugin that plans a task reads, `skills/task-work/reference/plan-method.md`.",
+  "note": "These criteria were written BEFORE the command body, from its definition of done, so they describe what the command should do rather than what it happens to do. Half of them were revised, and one added, after the review and the runs that checked the command: the diff of the commit that adds the command shows which lines. Same shape and same caveats as task-create.json: read them by hand, and see its `runner` note for why this is not the shape `claude plugin eval` executes. \"The planning method\" in them is the one file every command of this plugin that plans a task reads, `skills/task-work/reference/plan-method.md`.",
   "cases": [
     {
       "id": "writes-plan-only",
@@ -13,7 +13,7 @@
         "The plan holds what the \"Writing a plan\" section of the guide says a plan holds, written the way the planning method says.",
         "There is no approval round: the plan is saved without the user being asked to approve it first.",
         "It is saved with one `update_task` call that carries `plan` and no other field: not `title`, `body`, `priority` or `assignee`.",
-        "Then exactly one `log_progress` on that task, with no `status` and no `status_slug`. Its note says the plan was written by an agent through `/lorvel:task-plan`, and that nobody read it before it was saved.",
+        "Once `update_task` has answered that the plan is saved, and never in the same message as it, exactly one `log_progress` on that task, with no `status` and no `status_slug`. Its note says the plan was written by an agent through `/lorvel:task-plan`, and that nobody read it before it was saved.",
         "No other write: no `create_task`, no `reorder_subtasks`, nothing on any other task — the parent's status included.",
         "The run ends by reporting the task as a link, with what the plan leaves open, and stops. It does not start the work."
       ],
@@ -34,26 +34,38 @@
     {
       "id": "write-tool-absent",
       "query": "/lorvel:task-plan AB-12 — a task not yet started, with no plan",
-      "context": "`get_task` and `task_authoring_guide` are there, but `update_task` or `log_progress` is not, or the credential can only read.",
+      "context": "`get_task` and `task_authoring_guide` are there, but `update_task` or `log_progress` is not. A credential that can only read does not show at step 1: the server lists the same tools and refuses the write when it comes. Run that as a second state.",
       "expected_behavior": [
-        "The run says at step 1 which tool is missing, and stops there.",
+        "A write tool missing from the session ⇒ the run says at step 1 which one, and stops there.",
         "It does not read on, and asks the user nothing: a plan it cannot save is not worth their answers.",
-        "It does not write the plan into the chat, or into a file, in place of the task."
+        "With a tool missing there is no plan to put anywhere: the run does not draft one into the chat or into a file.",
+        "The save refused at step 4 for anything but an expired token — a credential that can only read, a permission nobody gave ⇒ the run says plainly that the plan is not saved, shows it in chat so the work is not lost, and writes no log entry."
       ],
-      "success_criteria": "PASS = the missing tool named before any question and before the reading. FAIL = the user asked the questions of step 3 and told only afterwards that nothing can be saved, or the plan put somewhere else."
+      "success_criteria": "PASS = with a tool missing, it is named before any question and before the reading; with the save refused, the run says so, the plan is in the chat, and there is no `log_progress` call. FAIL = the user asked the questions of step 3 and told only afterwards that a tool was missing; or a log entry saying a plan was written that is not on the task."
+    },
+    {
+      "id": "method-unreadable",
+      "query": "/lorvel:task-plan AB-12 — a task that already has a plan",
+      "context": "SPECIAL CASE: the planning method cannot be read. The Read of it is refused — the plugin's folder is outside the session's, and nobody is there to grant the permission — or the file is gone from the plugin.",
+      "expected_behavior": [
+        "The run says at step 1 that the planning method cannot be read, and stops there.",
+        "It stops before asking anything: the three reads of step 1 come before either gate's question, so the question about replacing the plan is not put to a user whose yes the run could not act on.",
+        "It does not plan from what it remembers of the method, or from the guide alone, and writes nothing."
+      ],
+      "success_criteria": "PASS = the run stops at step 1 and names the file, with no question and no write. FAIL = a plan written anyway; or the user asked whether to replace the plan, answering yes, and only then told the run cannot go on."
     },
     {
       "id": "plan-already-there",
       "query": "/lorvel:task-plan AB-12 — a task that already has a plan. Run it three times: the user answers no, the user answers yes, and the request itself says to replace the plan it has",
       "context": "Any status. Keep a copy of the plan as it was before each run.",
       "expected_behavior": [
-        "As soon as `get_task` shows a plan, the run asks whether to replace it, and says that the plan the task has is gone once it is replaced.",
-        "It asks before the reading: no `search_knowledge` call and no read of the code comes before the question.",
+        "Once the three reads of step 1 are in — the task, the guide, the planning method — and the task shows a plan, the run asks whether to replace it, and says that the plan the task has is gone once it is replaced.",
+        "It asks before the reading of step 2: no `search_knowledge` call and no read of the code comes before the question.",
         "No ⇒ the run ends there. Nothing is written: no `update_task`, no `log_progress`. `get_task` afterwards shows the plan as it was.",
         "Yes ⇒ the run goes on through the rest of its steps, and the plan it saves takes the place of the earlier one. Its log entry says an earlier plan was replaced.",
         "The request already says to replace the plan ⇒ the run does not ask again, and goes on."
       ],
-      "success_criteria": "PASS = the question before any reading; on no, zero write calls and a plan identical to the copy; on yes, one `update_task` carrying `plan` and one `log_progress` whose note says an earlier plan was replaced; no question where the request already answers it. FAIL = the plan replaced without a yes, the reading done before the question, or anything written on a no."
+      "success_criteria": "PASS = the question before any `search_knowledge` call and any read of the code; on no, zero write calls and a plan identical to the copy; on yes, one `update_task` carrying `plan` and one `log_progress` whose note says an earlier plan was replaced; no question where the request already answers it. FAIL = the plan replaced without a yes, that reading done before the question, or anything written on a no."
     },
     {
       "id": "no-one-to-ask",
@@ -113,23 +125,25 @@
       "expected_behavior": [
         "The run does not refuse a task that has subtasks, and does not ask which subtask was meant: the task named is the one planned.",
         "It does not ask whether to split the work: it is split already.",
-        "The plan maps the slices: its steps are the subtasks, in the order they depend on one another.",
+        "Each subtask is read with `get_task` before the plan is written.",
+        "The plan maps the slices: its steps are the subtasks, in the order they depend on one another, as the planning method says. The subtasks themselves are not reordered.",
+        "Its log entry says the plan maps slices and is not to be built from.",
         "No subtask is created, edited, reordered or planned: no `create_task`, no `reorder_subtasks`, no `update_task` on any task but AB-7.",
-        "The same holds for a task without subtasks that turns out to hold two outcomes that could ship on their own, once the user chooses to split it: the plan maps the slices, and creating them is left to the user."
+        "A task without subtasks that turns out to hold two outcomes that could ship on their own, once the user chooses to split it: the plan maps the slices too, and creating them is left to the user."
       ],
       "success_criteria": "PASS = one `update_task`, on AB-7, carrying a plan whose steps are the slices, and no write to any other task. FAIL = a subtask created or changed, the work of each subtask planned step by step inside the parent's plan, or the run stopped to ask which subtask to plan."
     },
     {
       "id": "task-language-is-kept",
       "query": "/lorvel:task-plan AB-12 — a task whose title, body and log are written in Vietnamese",
-      "context": "The command file is in English, and so are the planning method and the guide. The user types the command with no other words, or writes to the run in English.",
+      "context": "The command file is in English, and so are the planning method and the guide. Run it twice: the user types the command with no other words; then the user writes to the run in English.",
       "expected_behavior": [
         "The plan is written in the language of the task, the names of its parts included: the guide says they are not fixed labels.",
         "The log entry is in that language too, and keeps `/lorvel:task-plan` verbatim: that string is how anyone finds which plans an agent wrote.",
         "Identifiers stay verbatim: file paths, function and column names, command names, UI labels, anything quoted.",
-        "What the run says in chat follows the user: a question at step 3 is asked in the language they write in, whatever the task's."
+        "With no words from the user, what the run says in chat is in the task's language too. Where the user writes in another language, the replies follow the user, and the plan and the log entry still follow the task."
       ],
-      "success_criteria": "PASS = a plan and a log entry in the task's language, identifiers untouched, `/lorvel:task-plan` intact in the entry. FAIL = an English plan on a Vietnamese task, or a UI label or the command's name translated."
+      "success_criteria": "PASS = a plan and a log entry in the task's language, identifiers untouched, `/lorvel:task-plan` intact in the entry, and replies in the task's language when the user typed only the command. FAIL = an English plan on a Vietnamese task, an English question to a user who wrote nothing in English, or a UI label or the command's name translated."
     },
     {
       "id": "method-in-one-file",
@@ -139,7 +153,7 @@
         "Both commands read that one file with the Read tool, by the path their own text gives.",
         "After the change, the plan each command writes or shows follows the added line; before it, neither does.",
         "Nothing else was edited to get there: neither command holds a copy of the method.",
-        "`skills/task-plan/SKILL.md` says in what order the command works, where it stops and what it may write. It does not say what to read before writing a plan, which questions come first or how to write the steps, and it names no part of a plan."
+        "`skills/task-plan/SKILL.md` says in what order the command works, where it stops and what it may write. It does not say which questions come first or how to write the steps, and it names no part of a plan. About the reading it adds only what this command alone meets — a task that has subtasks, a log `get_task` returned in part, a session where part of the reading cannot be done — and the plugin's rule against opening a file in `.lorvel/`."
       ],
       "success_criteria": "PASS = the marker in both plans after the change and in neither before, with the planning method the only file edited. FAIL = one command that does not follow the line: it plans from text of its own."
     },
@@ -148,19 +162,19 @@
       "query": "/lorvel:task-plan AB-12 — a task whose status is in the `completed` or the `dropped` category",
       "context": "The task has no plan.",
       "expected_behavior": [
-        "The run says the task is closed, and asks before planning it.",
+        "The run says the task is closed, and asks whether to plan it anyway: before the reading, and in the same round as the question about a plan the task already has, when it has one.",
         "No ⇒ it ends, and nothing is written. Yes ⇒ it goes on as for any other task.",
         "Either way the status is not touched: the task is not reopened.",
         "Run for another agent, with no one to ask ⇒ the run ends with that question."
       ],
-      "success_criteria": "PASS = the question before any reading or writing, and the status as it was. FAIL = a plan written on a closed task without a word about it, or the task reopened."
+      "success_criteria": "PASS = the question before the reading of step 2 and before any write, and the status as it was. FAIL = a plan written on a closed task without a word about it, or the task reopened."
     },
     {
       "id": "no-customisation-yet",
       "query": "/lorvel:task-plan AB-12, in a repository whose `.lorvel/` folder holds a `task-plan.md` with a marker string that appears nowhere else",
       "context": "`.lorvel/task-work.md` and `.lorvel/task-create.md` may be there as well. Grep the transcript of the session that ran the command for the marker.",
       "expected_behavior": [
-        "The command does not look for `.lorvel/task-plan.md`, does not run the plugin's loader, and opens no file in `.lorvel/`.",
+        "The command does not look for `.lorvel/task-plan.md`, does not run the plugin's loader, and opens no file in `.lorvel/` — not while it reads the code either.",
         "The marker never reaches the transcript, and customisation is not mentioned."
       ],
       "success_criteria": "PASS = zero hits for the marker, and no call to `scripts/lorvel-load`. FAIL = the file read, by any tool. This command declares its IDs, but nothing applies a customisation to it yet, and a file read without the loader's checks is repository text taken as instructions."

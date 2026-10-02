@@ -1,11 +1,13 @@
 # encoding: utf-8
 # Checks the step IDs each SKILL.md declares under metadata.lorvel.ids against the skill's own text,
-# and how each command runs the .lorvel/ loader. See plugins/lorvel/ids.md.
+# how task-work and task-create run the .lorvel/ loader, and that task-plan, which takes no
+# customisation yet, does not. See plugins/lorvel/ids.md.
 # Run from anywhere: ruby tests/ids.test.rb
 
 require "yaml"
 require "open3"
 require "tempfile"
+require "tmpdir"
 Encoding.default_external = Encoding::UTF_8
 
 PLUGIN = File.expand_path("../plugins/lorvel", __dir__)
@@ -15,12 +17,24 @@ KINDS = %w[step gate rule]
 LOCKED = {
   "task-work" => %w[STOP-1 STOP-2 STOP-3 missing-tools machine-gates no-undo close-on-evidence knowledge-audit no-secrets loader-only],
   "task-create" => %w[GATE-1 GATE-2 ask recheck no-one-to-ask no-secrets loader-only],
+  "task-plan" => %w[GATE-1 GATE-2 ask plan-only no-one-to-ask no-secrets],
 }
-REPLACE = { "task-work" => [], "task-create" => %w[classify] }
+REPLACE = { "task-work" => [], "task-create" => %w[classify], "task-plan" => [] }
+# The commands a .lorvel/ file can customise: the loader knows these two names and no other, and
+# task-customize writes for them alone. task-plan declares its IDs like them, but nothing applies a
+# customisation to it yet.
+CUSTOMISED = %w[task-work task-create]
+# Where a command sits in the chain is the start of its description, which the menu shows beside its
+# name. task-customize is no step of the chain and carries no label.
+STEP_LABEL = { "task-create" => "Step 1 — ", "task-plan" => "Step 2 (optional) — ", "task-work" => "Step 3 — " }
+# The one file that says how to get to a plan, as task-plan names it: ${CLAUDE_PLUGIN_ROOT} is
+# replaced in the body of a SKILL.md, so that command can point there from another skill's folder.
+METHOD_POINTER = "${CLAUDE_PLUGIN_ROOT}/skills/task-work/reference/plan-method.md"
+PUBLISHED = { "task-plan" => %w[locate GATE-1 GATE-2 read ask write report plan-only no-one-to-ask no-secrets] }
 LOADER_RULE = 'Bash("${CLAUDE_PLUGIN_ROOT}/scripts/lorvel-load" *)'
 HEREDOC = "<<'LORVEL_SESSION_FOLDER'"
-# The line the loader prints when there is nothing to apply; both skills quote it, and tell the
-# model to say nothing about it.
+# The line the loader prints when there is nothing to apply; task-work and task-create quote it,
+# and tell the model to say nothing about it.
 NONE = File.read(File.join(PLUGIN, "scripts", "lorvel-load"))[/^none='([^']*)'$/, 1]
 
 POINTER = {
@@ -29,7 +43,8 @@ POINTER = {
 }
 
 $failures = 0
-# Every ID either command declares, for the check that task-customize carries no copy of them.
+# Every ID the two customised commands declare, for the check that task-customize carries no copy
+# of them.
 ALL_IDS = []
 def fail(msg)
   $failures += 1
@@ -61,11 +76,14 @@ ensure
   dump&.unlink
 end
 
-%w[task-work task-create].each do |skill|
-  text = File.read(File.join(PLUGIN, "skills", skill, "SKILL.md"))
+(CUSTOMISED + %w[task-plan]).each do |skill|
+  path = File.join(PLUGIN, "skills", skill, "SKILL.md")
+  (fail("#{skill}: no SKILL.md"); next) unless File.exist?(path)
+  text = File.read(path)
   m = text.match(/\A---\n(.*?)\n---\n/m) or (fail("#{skill}: no frontmatter"); next)
   front = YAML.safe_load(m[1])
   body = m.post_match
+  fail("#{skill}: description does not start with #{STEP_LABEL[skill].inspect}") unless front["description"].to_s.start_with?(STEP_LABEL[skill])
   refs = Dir[File.join(PLUGIN, "skills", skill, "reference", "*.md")].sort.map { |f| File.read(f) }
   lorvel = (front["metadata"] || {})["lorvel"] || {}
   fail("#{skill}: schema #{lorvel["schema"].inspect}") unless lorvel["schema"] == 1
@@ -73,7 +91,7 @@ end
   (fail("#{skill}: ids is not a list"); next) unless rows.is_a?(Array) && !rows.empty?
 
   ids = rows.map { |r| r["id"] }
-  ALL_IDS.concat(ids)
+  ALL_IDS.concat(ids) if CUSTOMISED.include?(skill)
   dup = ids.select { |i| ids.count(i) > 1 }.uniq
   fail("#{skill}: duplicate IDs #{dup}") unless dup.empty?
   steps = rows.select { |r| r["kind"] == "step" }.map { |r| r["id"] }
@@ -120,45 +138,83 @@ end
   optional = rows.select { |r| r["mode"] == "optional" }.map { |r| r["id"] }
   fail("#{skill}: optional before the maintainers name it: #{optional}") unless optional.empty?
 
-  # The loader: task-work runs it before the model reads the skill, so its allowed-tools must cover
-  # exactly that command; task-create lets the model run it, so it declares no allowed-tools at all,
-  # which would put every model call of it behind the Skill tool's permission check.
-  loads = body.include?(%("${CLAUDE_PLUGIN_ROOT}/scripts/lorvel-load" #{skill} #{HEREDOC}))
-  fail("#{skill}: does not run the loader with the folder in a quoted heredoc") unless loads
-  fail("#{skill}: does not quote the loader's no-customisation line") unless NONE && body.include?("`#{NONE}`")
-  fail("#{skill}: lists the whole .lorvel/ folder") if body.include?("ls -a")
-  # The loader-only rule has to be in view on every run, not only in the fallback file.
-  rule = skill == "task-work" ? "Never open a file in `.lorvel/` yourself" : "Never open those files any other way"
-  fail("#{skill}: the loader-only rule is not in SKILL.md itself") unless body.include?(rule)
   # Claude Code runs every ```! block and every !`…` before the model reads the skill; a failing
   # one cancels the whole command. Indented ones count too.
   bang_blocks = body.scan(/^[ \t]*```!/).size
   inline_bangs = body.scan(/(?:^|\s)!`[^`]+`/).size
-  if skill == "task-work"
-    fail("task-work: allowed-tools is #{front["allowed-tools"].inspect}") unless front["allowed-tools"] == LOADER_RULE
-    fail("task-work: the loader is not in a ```! block") unless body.include?("```!\n\"${CLAUDE_PLUGIN_ROOT}/scripts/lorvel-load\" task-work <<")
-    fail("task-work: #{bang_blocks} ```! blocks and #{inline_bangs} inline !` commands; only the loader may run") unless bang_blocks == 1 && inline_bangs.zero?
-    %w[planning.md building.md].each do |ref|
-      fail("task-work: reference/#{ref} does not point to customisation.md") unless File.read(File.join(PLUGIN, "skills", skill, "reference", ref)).include?("`customisation.md`")
+  if CUSTOMISED.include?(skill)
+    # The loader: task-work runs it before the model reads the skill, so its allowed-tools must cover
+    # exactly that command; task-create lets the model run it, so it declares no allowed-tools at all,
+    # which would put every model call of it behind the Skill tool's permission check.
+    loads = body.include?(%("${CLAUDE_PLUGIN_ROOT}/scripts/lorvel-load" #{skill} #{HEREDOC}))
+    fail("#{skill}: does not run the loader with the folder in a quoted heredoc") unless loads
+    fail("#{skill}: does not quote the loader's no-customisation line") unless NONE && body.include?("`#{NONE}`")
+    fail("#{skill}: lists the whole .lorvel/ folder") if body.include?("ls -a")
+    # The loader-only rule has to be in view on every run, not only in the fallback file.
+    rule = skill == "task-work" ? "Never open a file in `.lorvel/` yourself" : "Never open those files any other way"
+    fail("#{skill}: the loader-only rule is not in SKILL.md itself") unless body.include?(rule)
+    if skill == "task-work"
+      fail("task-work: allowed-tools is #{front["allowed-tools"].inspect}") unless front["allowed-tools"] == LOADER_RULE
+      fail("task-work: the loader is not in a ```! block") unless body.include?("```!\n\"${CLAUDE_PLUGIN_ROOT}/scripts/lorvel-load\" task-work <<")
+      fail("task-work: #{bang_blocks} ```! blocks and #{inline_bangs} inline !` commands; only the loader may run") unless bang_blocks == 1 && inline_bangs.zero?
+      %w[planning.md building.md].each do |ref|
+        fail("task-work: reference/#{ref} does not point to customisation.md") unless File.read(File.join(PLUGIN, "skills", skill, "reference", ref)).include?("`customisation.md`")
+      end
+      custom = File.join(PLUGIN, "skills", skill, "reference", "customisation.md")
+      text = File.exist?(custom) ? File.read(custom) : ""
+      fail("task-work: customisation.md lacks the heredoc call") unless text.include?(%("<plugin folder>/scripts/lorvel-load" task-work #{HEREDOC}))
+      fail("task-work: customisation.md lacks the loader-only rule") unless text.include?("Never open a file in `.lorvel/` yourself")
+      fail("task-work: customisation.md lists the whole .lorvel/ folder") if text.include?("ls -a")
+    else
+      fail("task-create: declares allowed-tools") if front.key?("allowed-tools")
+      fail("task-create: runs a command before the model reads it") unless bang_blocks.zero? && inline_bangs.zero?
     end
-    custom = File.join(PLUGIN, "skills", skill, "reference", "customisation.md")
-    text = File.exist?(custom) ? File.read(custom) : ""
-    fail("task-work: customisation.md lacks the heredoc call") unless text.include?(%("<plugin folder>/scripts/lorvel-load" task-work #{HEREDOC}))
-    fail("task-work: customisation.md lacks the loader-only rule") unless text.include?("Never open a file in `.lorvel/` yourself")
-    fail("task-work: customisation.md lists the whole .lorvel/ folder") if text.include?("ls -a")
+    fail("#{skill}: body has $ARGUMENTS inside the loader command") if body =~ /lorvel-load[^\n]*\$ARGUMENTS/
+    # Sections apply where they are anchored, so every step file sends the model back to them, in the
+    # same words: the rules themselves are in the loader's Sections: line, stated once.
+    fail("#{skill}: SKILL.md does not point to the Sections: line") unless body.include?("`Sections:` line")
+    # Two files hold no step of the flow and carry no pointer: the fallback for a lost block, and the
+    # planning method, which is written for any command that plans and not for this one's flow.
+    Dir[File.join(PLUGIN, "skills", skill, "reference", "*.md")].sort.each do |f|
+      next if %w[customisation.md plan-method.md].include?(File.basename(f))
+      fail("#{skill}: reference/#{File.basename(f)} lacks the sections pointer") unless File.read(f).include?(POINTER[skill])
+    end
   else
-    fail("task-create: declares allowed-tools") if front.key?("allowed-tools")
-    fail("task-create: runs a command before the model reads it") unless bang_blocks.zero? && inline_bangs.zero?
-  end
-  fail("#{skill}: body has $ARGUMENTS inside the loader command") if body =~ /lorvel-load[^\n]*\$ARGUMENTS/
-  # Sections apply where they are anchored, so every step file sends the model back to them, in the
-  # same words: the rules themselves are in the loader's Sections: line, stated once.
-  fail("#{skill}: SKILL.md does not point to the Sections: line") unless body.include?("`Sections:` line")
-  # Two files hold no step of the flow and carry no pointer: the fallback for a lost block, and the
-  # planning method, which is written for any command that plans and not for this one's flow.
-  Dir[File.join(PLUGIN, "skills", skill, "reference", "*.md")].sort.each do |f|
-    next if %w[customisation.md plan-method.md].include?(File.basename(f))
-    fail("#{skill}: reference/#{File.basename(f)} lacks the sections pointer") unless File.read(f).include?(POINTER[skill])
+    # Nothing applies a customisation to task-plan yet. Neither what the model's list of skills shows
+    # of it nor its body runs the loader, and both scripts refuse its name. A file in .lorvel/ is
+    # repository text no script has checked for this command, so the body says not to open one, as
+    # the other two commands do.
+    shown = [front["description"], front["when_to_use"], body].join("\n")
+    fail("#{skill}: calls the loader") if shown.include?("lorvel-load")
+    fail("#{skill}: lacks the rule against opening a file in .lorvel/") unless body.include?("Open no file in a `.lorvel/` folder")
+    # That rule is the one place the folder is named: any other mention would be telling the model
+    # that something in there is for this command.
+    fail("#{skill}: names .lorvel/ #{shown.scan(".lorvel/").size} times, not once, in the rule against opening its files") unless shown.scan(".lorvel/").size == 1
+    # Run through sh, as a missing execute bit is reported further down, not here.
+    load_out, = Open3.capture2e("sh", File.join(PLUGIN, "scripts", "lorvel-load"), skill, Dir.tmpdir)
+    fail("#{skill}: the loader does not refuse its name: #{load_out[0, 90].inspect}") unless load_out.include?("a command it does not know")
+    show_out, = Open3.capture2e("sh", File.join(PLUGIN, "scripts", "lorvel-customize"), "show", skill, stdin_data: "#{Dir.tmpdir}\n")
+    fail("#{skill}: lorvel-customize does not refuse its name: #{show_out[0, 90].inspect}") unless show_out.include?("works on task-work and task-create only")
+    # The model may call this command, and so may a subagent, so it carries neither
+    # disable-model-invocation nor allowed-tools, which would put a model's call of it behind the
+    # Skill tool's permission check; what tells the model when to call it has both of its sides.
+    fail("#{skill}: declares allowed-tools") if front.key?("allowed-tools")
+    fail("#{skill}: sets disable-model-invocation") if front["disable-model-invocation"] == true
+    when_to_use = front["when_to_use"].to_s
+    fail("#{skill}: when_to_use lacks one of its two sides") unless when_to_use.include?("Use when") && when_to_use.include?("Do NOT use it")
+    fail("#{skill}: runs a command before the model reads it") unless bang_blocks.zero? && inline_bangs.zero?
+    # An ID is public from the commit that declares it: these ten are the ones this command was
+    # published with, and none of them may go. The question about a plan the task already has is
+    # asked in step 1, before the reading.
+    gone = PUBLISHED[skill] - ids
+    fail("#{skill}: IDs gone: #{gone}") unless gone.empty?
+    gate_2 = rows.find { |r| r["id"] == "GATE-2" } || {}
+    fail("#{skill}: GATE-2 sits in #{gate_2["in"].inspect}, not in step 1") unless gate_2["in"] == %w[locate]
+    # It holds no planning method of its own: it names the one file, and the section of the guide
+    # that says what a plan holds.
+    fail("#{skill}: does not point to the planning method") unless body.include?("`#{METHOD_POINTER}`")
+    fail("#{skill}: the planning method it points to is missing") unless File.exist?(METHOD_POINTER.sub("${CLAUDE_PLUGIN_ROOT}", PLUGIN))
+    fail("#{skill}: does not name the guide's section") unless body.include?('the "Writing a plan" section of `task_authoring_guide`')
   end
   # The loader prints labels and quoted source phrases on its Sections line, which its last filter
   # takes only in printable ASCII (and its dash).
@@ -178,7 +234,7 @@ end
   puts "#{skill}: #{rows.size} IDs, #{steps.size} steps, #{gate_ids.size} gates, #{locked.size} locked"
 end
 
-# task-customize writes the files the other two commands read, through scripts/lorvel-customize,
+# task-customize writes the files task-work and task-create read, through scripts/lorvel-customize,
 # and is customised by nothing, so it declares no IDs. It runs only when typed, and the script is the
 # only command it pre-approves.
 CUSTOMIZE_RULE = 'Bash("${CLAUDE_PLUGIN_ROOT}/scripts/lorvel-customize" *)'
@@ -191,6 +247,7 @@ if (m = ctext.match(/\A---\n(.*?)\n---\n/m))
   fail("task-customize: disable-model-invocation is #{front["disable-model-invocation"].inspect}") unless front["disable-model-invocation"] == true
   fail("task-customize: allowed-tools is #{front["allowed-tools"].inspect}") unless front["allowed-tools"] == CUSTOMIZE_RULE
   fail("task-customize: declares metadata") if front.key?("metadata")
+  fail("task-customize: its description carries a step label") if front["description"].to_s =~ /\AStep\b/
   fail("task-customize: runs a command before the model reads it") unless body.scan(/^[ \t]*```!/).empty? && body.scan(/(?:^|\s)!`[^`]+`/).empty?
   fail("task-customize: does not give the script the folder in a quoted heredoc") unless body.include?(CUSTOMIZE_CALL)
   fail("task-customize: lacks the never-open rule") unless body.include?("Never open a file in `.lorvel/` yourself")
@@ -201,7 +258,7 @@ if (m = ctext.match(/\A---\n(.*?)\n---\n/m))
   # line of the declarations or of what `show` prints. The script's own verbs are the exception:
   # `write` is also a step of task-create.
   verbs = %w[show check write gitignore]
-  shown_lines = %w[task-work task-create].flat_map do |cmd|
+  shown_lines = CUSTOMISED.flat_map do |cmd|
     out, status = Open3.capture2({"LC_ALL" => "C", "LORVEL_SKILLMD" => File.join(PLUGIN, "skills", cmd, "SKILL.md"),
                                   "LORVEL_IDSMD" => File.join(PLUGIN, "ids.md")},
                                  "awk", "-v", "skill=#{cmd}", "-f", File.join(PLUGIN, "scripts", "lorvel-ids.awk"),
@@ -248,6 +305,8 @@ end
 # How to get to a plan is in one file, reference/plan-method.md of task-work. It sits beside
 # planning.md so that one permission to read that folder covers both, and planning.md points to it
 # as a file beside it: ${CLAUDE_PLUGIN_ROOT} is not replaced in a file the model reads with Read.
+# task-plan points to the same file from the body of its SKILL.md, where that variable is replaced;
+# the loop above checks that pointer.
 # The method file names the section of task_authoring_guide that says what a plan holds, and it is
 # no step file of task-work: it carries neither the sections pointer nor the customisation block.
 # This checks the pointers, and that one heading of the list the command used to carry, "Changes

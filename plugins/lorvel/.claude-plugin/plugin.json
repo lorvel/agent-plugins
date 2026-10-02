@@ -1,4 +1,4 @@
 {
   "name": "lorvel",
-  "description": "Author Lorvel tasks from chat: /lorvel:task-create walks a description into a task the guide's own shape approves of"
+  "description": "Create, plan and work Lorvel tasks from chat: /lorvel:task-create writes a task from a description, /lorvel:task-plan plans it, /lorvel:task-work works it through to closing"
 }

@@ -19,19 +19,21 @@ claude plugin install lorvel@lorvel-plugins
 | Command | What it does |
 |---|---|
 | `/lorvel:task-create` | Turns a one-line description into a Lorvel task, checking for duplicates and asking for what's missing before it writes. There is no draft to approve: edit or drop the task if it came out wrong. |
+| `/lorvel:task-plan` | Writes the plan of a task that already exists, and stops there: it reads the task, the knowledge and the code, asks what cannot wait, and saves the plan on the task. It changes no status and starts no work. Optional: `/lorvel:task-work` plans for itself. |
 | `/lorvel:task-work` | Works one task from reading it through to closing it: analyse, plan, implement, review, ship, audit the knowledge, close. Stop gates before planning and before committing. |
-| `/lorvel:task-customize` | Writes this repository's customisation of the other two commands, in `.lorvel/`: shows where each can be changed, asks what you want, checks it, and shows the flow once it applies. |
+| `/lorvel:task-customize` | Writes this repository's customisation of `/lorvel:task-create` and `/lorvel:task-work`, in `.lorvel/`: shows where each can be changed, asks what you want, checks it, and shows the flow once it applies. |
 
-`/lorvel:task-create` needs a connected Lorvel MCP server with write access. It
-checks for that up front and stops if the tools aren't there, rather than
-writing a malformed task.
+`/lorvel:task-create` and `/lorvel:task-plan` need a connected Lorvel MCP server
+they can write to. Each checks up front that the tools are there and stops if they
+aren't, rather than writing a malformed task or a plan from memory.
 
-You don't have to type `/lorvel:task-create`: ask Claude for a task in plain
-words and it will usually run the same command — type it when you want to be
-sure. Another agent working for you can run it too. It is written to run only
-when someone asks for a task, never because Claude decided something deserves
-one. If it needs to ask you something and the agent running it can't reach
-you, it hands the questions back to that agent and creates nothing.
+You don't have to type `/lorvel:task-create` or `/lorvel:task-plan`: ask Claude
+in plain words for a task, or to plan a task you name, and it will usually run the
+same command — type it when you want to be sure. Another agent working for
+you can run them too. Each is written to run only when someone asks for what it
+does, never because Claude decided that something deserves a task or that a task
+needs a plan. If one needs to ask you something and the agent running it can't
+reach you, it hands the questions back to that agent and writes nothing.
 `/lorvel:task-work` and `/lorvel:task-customize` still run only when you type them.
 
 `/lorvel:task-work` assumes your setup already has a way to review a change and a
@@ -39,16 +41,26 @@ way to commit one; it says when to reach for them and leaves the choice to you.
 It never commits or pushes on its own unless you pass `--auto`, and even then a
 change with no undo — a migration, a deploy pin — falls back to waiting for you.
 
-How `/lorvel:task-work` gets to a plan is in one file,
+`/lorvel:task-plan` is the planning on its own, for when you want to read a plan
+before any work starts. It writes the plan onto the task, and one entry in the task's
+log saying an agent wrote it. Nothing else: no status changes, no other task is created
+or edited, no file in your repository is touched. It does not wait for you to approve
+the plan either: you read it once it is saved, and rewrite or remove it if it is wrong.
+A task that already has a plan is not overwritten without your yes — the command asks
+first, before it reads the knowledge base or the code, because saving a plan replaces the
+one before and nothing keeps the old text.
+
+How `/lorvel:task-plan` and `/lorvel:task-work` get to a plan is in one file,
 `plugins/lorvel/skills/task-work/reference/plan-method.md`: what to read first, what to
 ask before writing, and a few finer rules for writing the steps. What a plan is — its
 parts, which of them are always there — is not in the plugin: it comes from
-`task_authoring_guide`, like the shape of a task. A task that already has a plan when
-the command starts keeps it. The command works from that plan instead of writing
-another: it rewrites a line of it only where your answer to one of its questions
+`task_authoring_guide`, like the shape of a task. `/lorvel:task-work` keeps a plan the
+task already has when it starts, whoever wrote it. It works from that plan instead of
+writing another: it rewrites a line of it only where your answer to one of its questions
 changes a step or the approach, and writes a new plan only if you ask for one.
 
-Both commands carry **sequence, not shape**. What is specific to a project — its
+`/lorvel:task-create`, `/lorvel:task-plan` and `/lorvel:task-work` carry **sequence,
+not shape**. What is specific to a project — its
 field rules, its status vocabulary, its conventions — is read at runtime from
 `task_authoring_guide` and `search_knowledge`, so the project's own answers win
 over anything written into these files. That split is deliberate: a procedure that
@@ -56,8 +68,10 @@ hardcodes a project's facts drifts away from them the moment they change.
 
 ## Customising the commands
 
-A repository can change parts of both commands without forking the plugin, with files in
-`.lorvel/` in the folder the session was opened in:
+A repository can change parts of `/lorvel:task-work` and `/lorvel:task-create` without
+forking the plugin. `/lorvel:task-plan` takes no customisation yet: it declares its
+steps the way those two do, but no file is read for it. The files go in `.lorvel/`, in
+the folder the session was opened in:
 
 - `.lorvel/task-work.md` and `.lorvel/task-create.md` — shared: commit them, and the whole
   team gets them.
@@ -110,9 +124,9 @@ The settings are `/lorvel:task-work`'s; `/lorvel:task-create` has none yet.
   run; typed together with `--plan`, STOP-2 stays on.
 
 A section is a `## before: <ID>`, `## after: <ID>`, `## replace: <ID>` or `## skip: <ID>`
-heading and the text Claude follows there. The IDs are each command's steps, gates and
-rules, declared with what a customisation may do at each in the `metadata` of its
-`SKILL.md`; `plugins/lorvel/ids.md` says what the fields and modes mean.
+heading and the text Claude follows there. The IDs are the steps, gates and rules of
+the command the file is for, declared with what a customisation may do at each in the
+`metadata` of its `SKILL.md`; `plugins/lorvel/ids.md` says what the fields and modes mean.
 
 - `before:` and `after:` add a step next to any step or gate. A gate keeps its place when
   it is switched off, and GATE-2 of `/lorvel:task-create`, which sits in two steps, runs
@@ -276,6 +290,10 @@ written criteria.
 `/lorvel:task-customize`, written from its definition of done before the runs that
 checked it.
 
+`plugins/lorvel/evaluations/task-plan.json` does the same for `/lorvel:task-plan`. Its
+first version was committed before the command existed; half of its cases were then
+revised after the review and the runs that checked the command.
+
 They are read by hand. The shape is borrowed from another plugin's evaluations
 and is not the shape `claude plugin eval` executes, which is why they sit in
 `evaluations/` rather than `evals/`; the file itself says what porting them to
@@ -288,7 +306,9 @@ server through both a project `.mcp.json` and an app-level connector, under
 different names, and closing one of them leaves the test proving nothing. If a well-formed task comes out anyway, the shape of a task has been
 copied into the command file, and the runtime guide is no longer the only source
 of it. That is the one thing a reader cannot check by skimming — a short command
-file is not proof of an uncopied one.
+file is not proof of an uncopied one. `task-plan.json` has a case of the same kind
+for the shape of a plan: it blocks that one tool, and the same run with the tool there
+is its control.
 
 ## Local development
 

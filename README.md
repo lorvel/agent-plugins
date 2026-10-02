@@ -39,6 +39,15 @@ way to commit one; it says when to reach for them and leaves the choice to you.
 It never commits or pushes on its own unless you pass `--auto`, and even then a
 change with no undo — a migration, a deploy pin — falls back to waiting for you.
 
+How `/lorvel:task-work` gets to a plan is in one file,
+`plugins/lorvel/skills/task-work/reference/plan-method.md`: what to read first, what to
+ask before writing, and a few finer rules for writing the steps. What a plan is — its
+parts, which of them are always there — is not in the plugin: it comes from
+`task_authoring_guide`, like the shape of a task. A task that already has a plan when
+the command starts keeps it. The command works from that plan instead of writing
+another: it rewrites a line of it only where your answer to one of its questions
+changes a step or the approach, and writes a new plan only if you ask for one.
+
 Both commands carry **sequence, not shape**. What is specific to a project — its
 field rules, its status vocabulary, its conventions — is read at runtime from
 `task_authoring_guide` and `search_knowledge`, so the project's own answers win

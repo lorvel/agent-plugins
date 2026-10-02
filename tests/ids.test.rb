@@ -154,8 +154,10 @@ end
   # Sections apply where they are anchored, so every step file sends the model back to them, in the
   # same words: the rules themselves are in the loader's Sections: line, stated once.
   fail("#{skill}: SKILL.md does not point to the Sections: line") unless body.include?("`Sections:` line")
+  # Two files hold no step of the flow and carry no pointer: the fallback for a lost block, and the
+  # planning method, which is written for any command that plans and not for this one's flow.
   Dir[File.join(PLUGIN, "skills", skill, "reference", "*.md")].sort.each do |f|
-    next if File.basename(f) == "customisation.md"
+    next if %w[customisation.md plan-method.md].include?(File.basename(f))
     fail("#{skill}: reference/#{File.basename(f)} lacks the sections pointer") unless File.read(f).include?(POINTER[skill])
   end
   # The loader prints labels and quoted source phrases on its Sections line, which its last filter
@@ -242,6 +244,29 @@ PROGRAMS.each do |files|
     end
   end
 end
+
+# How to get to a plan is in one file, reference/plan-method.md of task-work. It sits beside
+# planning.md so that one permission to read that folder covers both, and planning.md points to it
+# as a file beside it: ${CLAUDE_PLUGIN_ROOT} is not replaced in a file the model reads with Read.
+# The method file names the section of task_authoring_guide that says what a plan holds, and it is
+# no step file of task-work: it carries neither the sections pointer nor the customisation block.
+# This checks the pointers, and that one heading of the list the command used to carry, "Changes
+# by file", has not come back under skills/. That no file restates the guide is for a reader to
+# check, not for this test.
+method = File.join(PLUGIN, "skills", "task-work", "reference", "plan-method.md")
+if File.exist?(method)
+  mtext = File.read(method)
+  fail("plan-method.md does not name the guide's section") unless mtext.include?('the "Writing a plan" section of `task_authoring_guide`')
+  fail("plan-method.md speaks of the customisation of one command") if mtext.include?("<customisation>") || mtext.include?(POINTER["task-work"])
+else
+  fail("task-work: reference/plan-method.md is missing")
+end
+planning = File.read(File.join(PLUGIN, "skills", "task-work", "reference", "planning.md"))
+fail("task-work: reference/planning.md does not point to plan-method.md beside it") unless planning.include?("`plan-method.md`, beside this file")
+Dir[File.join(PLUGIN, "skills", "**", "*.md")].sort.each do |f|
+  fail("#{f.delete_prefix(PLUGIN + "/")}: carries the old list of plan headings") if File.read(f).include?("Changes by file")
+end
+puts "plan method: skills/task-work/reference/plan-method.md, named by planning.md beside it"
 
 ids_md = File.read(File.join(PLUGIN, "ids.md"))
 ["- `locked` —", "- `extend` —", "- `replace` —", "- `optional` —", "`metadata.lorvel.ids`", "| `source` |"].each do |s|

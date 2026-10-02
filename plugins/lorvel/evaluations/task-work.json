@@ -1,6 +1,6 @@
 {
   "command": "lorvel:task-work",
-  "note": "Criteria for two parts of this command, each written from its definition of done before the runs that check them. First the .lorvel/ customisation it reads, with the loader: the settings in the frontmatter, then the sections in the body. Then, in the six cases at the end, from `plan-method-read-first` on, how it gets to a plan: the planning method the plugin keeps in one file, and a task that already has a plan. They cover only those parts of the command. Same shape and same caveats as task-create.json: read them by hand, and see its `runner` note for why this is not the shape `claude plugin eval` executes.",
+  "note": "Criteria for two parts of this command, each written from its definition of done before the runs that check them. First the .lorvel/ customisation it reads, with the loader: the settings in the frontmatter, then the sections in the body. Then, in the eight cases at the end, from `plan-method-read-first` on, how it gets to a plan: the planning method the plugin keeps in one file, and a task that already has a plan. They cover only those parts of the command. Same shape and same caveats as task-create.json: read them by hand, and see its `runner` note for why this is not the shape `claude plugin eval` executes.",
   "cases": [
     {
       "id": "no-customisation-unchanged",
@@ -244,69 +244,92 @@
       "query": "/lorvel:task-work AB-12 --plan — a task not yet started, with no plan, that is a subtask of AB-7",
       "context": "Any repository the task is about. Run it in a session opened after the plugin's files last changed, and read the tool calls from the transcript.",
       "expected_behavior": [
-        "Before phase 1 searches the knowledge or opens the code, the run reads `reference/planning.md` and then the plugin's planning method, `plan-method.md` at the root of the plugin, with the Read tool.",
-        "It reads what that file says to read, in its order: the task, the parent task AB-7, the knowledge, then the code.",
-        "What it asks at STOP-1 comes after that reading, in one round, each question with the answer it would recommend."
+        "Phase 1 starts by reading `reference/planning.md` and then the plugin's planning method, `reference/plan-method.md`, with the Read tool.",
+        "By the time STOP-1 is reached, everything that file lists has been read: the task, the parent task AB-7, the knowledge, what the project has settled about plans, and the code.",
+        "What it asks at STOP-1 comes after that reading, all together, each question with the answer it would recommend."
       ],
-      "success_criteria": "PASS = a `Read` of `plan-method.md` in the transcript before the first `search_knowledge`, and a `get_task` on the parent before the plan is shown. FAIL = no `Read` of that file, or a plan shown without the parent having been read."
+      "success_criteria": "PASS = in the transcript, before the questions or the plan: a `Read` of `plan-method.md`, a `get_task` on the parent, and a `search_knowledge` about the project's conventions on plans; and every question carries a recommended answer. FAIL = any of the three calls missing, or the questions asked before the reading is done."
     },
     {
       "id": "plan-follows-guide",
       "query": "/lorvel:task-work AB-12 --plan — a task not yet started, with no plan, whose body has a definition of done",
-      "context": "A task large enough to need several steps, written in a language other than English. The plan is read from the transcript at STOP-2, before anything is written. Have beside you the \"Writing a plan\" section `task_authoring_guide` returned in that run, and `plan-method.md`.",
+      "context": "A task large enough to need several steps, written in a language other than English, and worked as one piece: if the run asks whether to split it, the answer is to keep it as one. The plan is read from the transcript at STOP-2, before anything is saved. Have beside you the \"Writing a plan\" section `task_authoring_guide` returned in that run, and `reference/plan-method.md`.",
       "expected_behavior": [
-        "The plan holds what that section of the guide says a plan holds, named in the task's language, and nothing the work has no content for.",
-        "It is not built on the list this command used to carry — context, changes by file, order of work, definition of done, risks — and it does not copy the body's definition of done, as a list or as a table.",
-        "It follows what the method file adds: a test or a document sits in the step that owes it; a premise nobody has checked is checked by the first step; a file is named in the step that touches it, by path and function name, with no line number and no pasted code; the last step before closing is a knowledge audit.",
-        "For how long a plan should be, it asked the project's knowledge base — a `search_knowledge` call — instead of bringing numbers of its own. Where the project states its limits, the plan keeps to them or says why it does not."
+        "The plan holds what that section of the guide says a plan holds, the way the section says it, and nothing the work has no content for.",
+        "It is not the plan this command used to write: no section listing the changes file by file beside the steps, and the body's definition of done is not copied in, as a list or as a table.",
+        "It follows the finer rules of the method file: a test or a document sits in the step that owes it; a premise nobody has checked is checked by the first step; something a step will find out is not listed as undecided; a file is named in the step that touches it, by its path or a function name, with no line number; the last step before closing is a knowledge audit.",
+        "Where the project's knowledge base has settled something about plans, the plan keeps to it, even against a finer rule of the method file."
       ],
-      "success_criteria": "PASS = every sentence of the guide's section and every rule of the method file checked against the plan, with the plan's text quoted for any that fails; none fails. FAIL = a section listing changes by file beside the steps, a copied definition of done, a line number, or a step with no way to tell it is done."
+      "success_criteria": "PASS = every sentence of the guide's section, every finer rule of the method file that the project's conventions do not override, and each such convention, checked against the plan, with the plan's text quoted for any that fails; none fails. FAIL = a file-by-file list of changes beside the steps, a copied definition of done, a line number, or an item listed as undecided that one of the plan's own steps settles."
     },
     {
       "id": "plan-guide-absent",
       "query": "/lorvel:task-work AB-12 --plan — a task not yet started, with no plan",
-      "context": "SPECIAL CASE: every other Lorvel tool is there, but `task_authoring_guide` is not, on every route to the server — see `guide-tool-absent` in task-create.json for why one route is not enough. In a session with a single route, blocking that one tool for the run does it.",
+      "context": "SPECIAL CASE: every other Lorvel tool is there, but `task_authoring_guide` is not, on every route to the server — see `guide-tool-absent` in task-create.json for why one route is not enough. In a session with a single route, blocking that one tool for the run does it. Run it on the last version that carried its own list of plan headings as well: that run is the control.",
       "expected_behavior": [
-        "The run stops and says plainly that `task_authoring_guide` is missing.",
-        "No plan is shown and nothing is written: what a plan holds comes from the guide, and the plugin's method file only says how to get to one.",
+        "The run stops and says plainly that `task_authoring_guide` is missing. It stops without asking the user anything: the method file says to stop before the reading.",
+        "No plan is shown and nothing is written: what a plan holds comes from the guide, and the method file says to stop without it.",
         "It reports the missing tool and nothing more, as phase 0 says for missing tools."
       ],
-      "success_criteria": "PASS = the run stops and names the missing tool, with no plan in the transcript. FAIL = a plan shaped the way the guide asks comes out anyway ⇒ what a plan holds has been copied into the plugin, and the guide is no longer the only place that says it. A check on size cannot catch that; only this case does."
+      "success_criteria": "PASS = the run stops and names the missing tool, with no plan and no question to the user in the transcript. FAIL = a plan comes out anyway. Read it beside the control: this case shows a difference only where the older version, in the same session, went on to a plan built on its own headings. Where the control stops too, the case says nothing about what the plugin carries."
     },
     {
       "id": "plan-already-there",
       "query": "/lorvel:task-work AB-12 — a task not yet started that already has a plan, written earlier by a person or by another run",
-      "context": "The task's status is still in the `todo` category and its log shows no work. No `--plan`, and no `.lorvel/` default turning STOP-2 on.",
+      "context": "The task's status is still in the `todo` category and its log shows no work. No `--plan`, and no `.lorvel/` default turning STOP-2 on. The plan fits the body and the code, so no answer at STOP-1 changes it.",
       "expected_behavior": [
-        "Phase 0 says the run enters phase 1, and that the task already has a plan.",
-        "Phase 1 runs as for any task, and STOP-1 asks what is still unclear, a point the plan itself leaves open included. It does not ask whether to plan again.",
-        "Phase 2 writes no plan: `update_task` is never called with `plan`. What STOP-1 settled that the plan does not say goes into the `log_progress` entry that moves the task to `in_progress`.",
-        "The run says in one line that it follows the plan the task already has, and phase 3 works from it."
+        "Phase 0 says the run enters phase 1.",
+        "Phase 1 runs as for any task: the reading the planning method lists, then STOP-1 for what is still unclear, a point the plan itself leaves open included. It does not ask whether to plan again.",
+        "Phase 2 saves no plan: `update_task` is never called with `plan`. Its only write to the task is the `log_progress` moving it to `in_progress`, whose note carries what STOP-1 settled.",
+        "The run says in one line that it follows the plan already on the task, says so in that `log_progress` note too, and phase 3 works from the plan."
       ],
-      "success_criteria": "PASS = no `update_task` call carrying `plan` in the transcript, one `log_progress` moving the task to `in_progress`, and no question about planning again. FAIL = the plan rewritten or replaced, or the user asked whether to rewrite it."
+      "success_criteria": "PASS = phase 1's reading in the transcript, no `update_task` call carrying `plan`, one `log_progress` moving the task to `in_progress` whose note says the run follows the plan already on the task and carries what STOP-1 settled, and no question about planning again. FAIL = the plan rewritten or replaced, the user asked whether to rewrite it, phase 1 skipped, or an answer given at STOP-1 that ends up nowhere on the task."
+    },
+    {
+      "id": "plan-already-there-answer-changes-it",
+      "query": "/lorvel:task-work AB-12 — a task not yet started whose plan has a step the user's answer at STOP-1 overturns",
+      "context": "As `plan-already-there`, except for one step of the plan: it goes against a convention the project's knowledge base states, or the plan leaves a point about it open. Asked at STOP-1, the user decides against what the plan says or recommends. Keep a copy of the plan as it was before the run.",
+      "expected_behavior": [
+        "STOP-1 asks about that step, with the answer the run would recommend.",
+        "After the answer, the run rewrites in the plan the lines that answer changed, and no others, and says which lines changed.",
+        "It saves that plan with `update_task`, then moves the task to `in_progress`. It does not write a plan of its own, and does not ask whether to."
+      ],
+      "success_criteria": "PASS = a diff between the plan before the run and the plan saved shows only the lines the answer changed, and the run named them. FAIL = the plan left saying what the user decided against, with the decision only in the log; or the whole plan re-worded, shortened or rebuilt."
     },
     {
       "id": "plan-already-there-plan-flag",
-      "query": "/lorvel:task-work AB-12 --plan — the task of `plan-already-there`; then once more without the flag, with STOP-2 on by a `.lorvel/` default",
+      "query": "/lorvel:task-work AB-12 --plan — a task in the state `plan-already-there` describes; then, on a second task in that state, the command without the flag and with STOP-2 on by a `.lorvel/` default",
       "context": "As `plan-already-there`. For the second run, `.lorvel/task-work.md` sets `defaults:` / `plan: true`.",
       "expected_behavior": [
-        "At the end of phase 2 the run shows the plan the task already has and waits for approval.",
-        "Nothing is written before the user answers: no `update_task`, and no `log_progress` moving the status.",
-        "Once approved, it moves the task to `in_progress` and starts phase 3; it still writes no plan.",
+        "Phase 1 runs as for any task. At the end of phase 2 the run shows the plan the task already has, as it stands, and waits for approval.",
+        "Nothing is written before the user answers: no `update_task`, and no `log_progress` — the status does not move, on the task or on its parent.",
+        "Once approved, it moves the task to `in_progress` with a note that carries what STOP-1 settled, and starts phase 3. The plan is not saved again: no answer changed it.",
         "Both ways of turning STOP-2 on behave the same."
       ],
-      "success_criteria": "PASS = the task's own plan shown and waited on, no write call before the approval, and no `update_task` carrying `plan` after it. FAIL = the gate skipped because there was nothing to write, or a new plan shown in place of the task's own."
+      "success_criteria": "PASS = phase 1's reading in the transcript, the task's own plan shown in full and waited on, no write call before the approval, and after it one `log_progress` moving the task to `in_progress`, whose note carries what STOP-1 settled, and no `update_task` carrying `plan`. FAIL = the gate skipped because there was nothing to save, a summary or a new plan shown in place of the task's own, or the status moved before the approval."
+    },
+    {
+      "id": "plan-maps-slices",
+      "query": "/lorvel:task-work AB-12 --plan — a task not yet started whose body asks for two things that could each ship without the other; then a second run on the same task once its plan is saved",
+      "context": "At STOP-1 the user answers the question about splitting with \"split it\". No subtask is created between the two runs.",
+      "expected_behavior": [
+        "STOP-1 asks whether to split the work or keep it as one, with the answer the run would recommend.",
+        "The plan it shows has one step per slice, in the order the slices depend on one another, and creates no subtask.",
+        "Once approved, and not before, the plan is saved with `update_task` alone: no `log_progress` moves the status, and the note of the one that is written says the plan maps slices and is not to be built from. The run stops and says the slices are the user's to create.",
+        "The second run finds the task not started and with a plan, goes through phase 1, keeps the plan, moves no status, and stops again: it builds nothing from a map of slices."
+      ],
+      "success_criteria": "PASS = in the first run: the question about splitting; a plan whose steps are the slices; no write before the approval; then one `update_task` carrying `plan` and no status move. In the second: the plan left as it is, no status move and no file changed. FAIL = the task moved to `in_progress`, a subtask created, the plan saved before it was approved or replaced by the second run, or a run that starts building from the map."
     },
     {
       "id": "plan-change-leaves-the-rest",
-      "query": "/lorvel:task-work AB-12, run in the same folder on the last version that carried its own list of plan headings and on this one",
+      "query": "/lorvel:task-work AB-12, run from the same plugin path and in the same folder on the last version that carried its own list of plan headings, and on this one",
       "context": "Compare what the model is given, not what it does: the rendered text of the command in each run's transcript, and each file under `skills/task-work/reference/` as the Read tool returns it.",
       "expected_behavior": [
         "The rendered command text differs in two lines only: the row of the phase 0 table for a task that already has a plan, and the phase 2 row of the phase map.",
-        "`reference/planning.md` differs in how phases 1 and 2 read, ask and plan; `reference/building.md`, `reference/shipping.md` and `reference/customisation.md` are byte-identical.",
-        "Nothing under `skills/` says what a plan holds or how to write one any more: the list of headings and the rule about a knowledge audit step are gone from `reference/planning.md`, and appear nowhere else."
+        "`reference/planning.md` differs in how phases 1 and 2 read, ask and plan, and `reference/plan-method.md` is new; `reference/building.md`, `reference/shipping.md` and `reference/customisation.md` are byte-identical.",
+        "One file says how to get to a plan, `reference/plan-method.md`. `SKILL.md` and `reference/planning.md` keep the order of the phases and their gates, and point to it. The list of headings this command used to carry is in no file."
       ],
-      "success_criteria": "PASS = a diff of the two renders showing exactly those two lines, and no diff for the three other reference files. FAIL = any other line of the render changed, or a second place that says what a plan holds or how to write one."
+      "success_criteria": "PASS = a diff of the two renders showing exactly those two lines, and no diff for the three other reference files. FAIL = any other line of the render changed, or a second file that says how to write a plan."
     }
   ],
   "public_safe": true,

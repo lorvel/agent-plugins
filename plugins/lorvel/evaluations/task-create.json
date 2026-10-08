@@ -1,6 +1,6 @@
 {
   "command": "lorvel:task-create",
-  "note": "These criteria were written BEFORE the command body, so they describe what the command should do rather than what it happens to do. The case shape (query / context / expected_behavior / success_criteria) is borrowed from the Notion plugin's evaluations. Read them by hand — see `runner` for why this file is not the shape the first-party runner executes. The customisation cases at the end came later, with the `.lorvel/` loader and then its sections, and were written from their definitions of done.",
+  "note": "These criteria were written BEFORE the command body, so they describe what the command should do rather than what it happens to do. The case shape (query / context / expected_behavior / success_criteria) is borrowed from the Notion plugin's evaluations. Read them by hand — see `runner` for why this file is not the shape the first-party runner executes. The customisation cases at the end came later, with the `.lorvel/` loader and then its sections, and were written from their definitions of done. `recheck-excludes-read-matches` came later as well, when step 6 began passing `exclude_ids`.",
   "cases": [
     {
       "id": "ambiguous-input",
@@ -16,7 +16,7 @@
         "Ask at least one clarifying question: what is happening, versus what should happen instead.",
         "The inference reaches the user INSIDE the step-5 round, in their language and in a form they can push back on (\"I am treating this as a bug; say so if it is not\") — in the text of the round itself, not in prose beside it. Never a round of its own.",
         "Do NOT set `priority`, and do NOT lay out a list of priority levels for the user to pick from.",
-        "Call `check_similar_tasks` a SECOND time, with the full title and body, before `create_task`.",
+        "Call `check_similar_tasks` a SECOND time, with the full title and body and with every match the first call returned, if it returned any, as `exclude_ids`, before `create_task`.",
         "Nothing comes back duplicating on that second check, so the run does NOT stop to ask whether to create, edit or cancel. A round spent asking permission to write is the regression THIS line guards.",
         "`create_task` IS called in this run, followed by exactly one `log_progress` receipt.",
         "The receipt does not claim the user read or approved the text — nobody did. A receipt implying a review that never happened is a FAIL.",
@@ -38,6 +38,20 @@
         "User picks extending the existing task ⇒ `create_task` is never called."
       ],
       "success_criteria": "The duplicate is named before any `create_task`, INCLUDING when the verdict is `distinct`. Nothing is created without an explicit user decision made AFTER seeing the match. This case FAILS if the output quotes the verdict and moves on."
+    },
+    {
+      "id": "recheck-excludes-read-matches",
+      "query": "/lorvel:task-create with a description that answers everything step 5 would ask",
+      "context": "Lorvel MCP connected to a project with open tasks, none of them the same work as the description — so the first duplicate check returns matches the agent reads and passes over. `check_similar_tasks` takes `exclude_ids`: task uuids or refs to leave out of the comparison; the session has `get_task` and is allowed to call it. Stop `create_task` with a hook: this case is about what comes before it. Second run, for the second look: one open task is the same work as the description, under a title that names the same area and a different-sounding ask — near enough that the title cannot rule it out, far enough that step 2 passes over it on the title. A project of five open tasks or fewer makes this sharp: the first call returns every task, the second returns none, and the second look is the only check the full draft gets.",
+      "expected_behavior": [
+        "Call `check_similar_tasks` with a draft title, and read the matches.",
+        "Call `check_similar_tasks` a second time with the full title and body, passing as `exclude_ids` EVERY match the first call returned — by `id` or by `ref`.",
+        "The list is not cut by `verdict` or similarity: a match at `distinct` is excluded like any other.",
+        "The second answer lists none of the first call's matches.",
+        "The tool no longer returning the first call's matches is no reason to drop them. Second run: the planted task is opened with `get_task` before `create_task`.",
+        "Second run: it then goes through GATE-2 at step 6 — shown with ref and link, and with step 2's verdict and similarity named as measured on the draft title (or said to be no longer in view, never made up), asked about, nothing created until the user answers — although the second call's answer does not list it."
+      ],
+      "success_criteria": "PASS, first run = quoted from the transcript: the second `check_similar_tasks` call carries `exclude_ids` naming every match of the first, and its answer lists none of them. The run must have at least one match at the first call — with none, it measures nothing. PASS, second run = a `get_task` call on the planted task that returned its body, the task shown at step 6, and no `create_task` attempted before the user answers. The planted task shown at step 2 instead ⇒ correct, and it measures nothing of the second look: plant a less obvious title and run again. Shown at step 6 without a `get_task` call ⇒ nothing was created, but the body was never read: not a PASS of the second look. FAIL = no `exclude_ids` on the second call; an `exclude_ids` that leaves out any match of the first call, whatever the reason; or, in the second run, `create_task` attempted without the planted task having been shown. The second run is where the cost this case guards shows: excluding what was read makes the tool say less, and the agent's own second look is what pays for it."
     },
     {
       "id": "user-defers-decision",

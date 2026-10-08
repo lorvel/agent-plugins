@@ -87,7 +87,7 @@ not the instructions; working from them is the guessing this command exists to p
 | **3** Classify | Bug, change or spike — **you** settle it; step 5 states it, and asks only when there is nothing to go on. | `reference/drafting.md` |
 | **4** Context | Knowledge first, then the code. Read only; do not design the fix. | *(same file)* |
 | **5** Ask | What the user has not said — **do not skip this step**. | *(same file)* |
-| **6** Re-check | The full `title` + `body` into `check_similar_tasks` once more; nothing new ⇒ on to step 7. **GATE-2**. | `reference/writing.md` |
+| **6** Re-check | The full `title` + `body` into `check_similar_tasks` once more, leaving out every match the earlier checks returned — those you weigh again yourself; no possible duplicate left to ask about ⇒ on to step 7. **GATE-2**. | `reference/writing.md` |
 | **7** Write | `create_task`, one `log_progress` receipt, then report the link. | *(same file)* |
 
 The command can end early at **step 1** — no guide tool — or at **step 2** or **step 6**, wherever

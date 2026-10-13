@@ -1,6 +1,6 @@
 {
   "command": "lorvel:task-work",
-  "note": "Criteria for two parts of this command, each written from its definition of done before the runs that check them. First the .lorvel/ customisation it reads, with the loader: the settings in the frontmatter, then the sections in the body. Then, in the eight cases at the end, from `plan-method-read-first` on, how it gets to a plan: the planning method the plugin keeps in one file, and a task that already has a plan. They cover only those parts of the command. Same shape and same caveats as task-create.json: read them by hand, and see its `runner` note for why this is not the shape `claude plugin eval` executes.",
+  "note": "Criteria for three parts of this command, each written from its definition of done before the runs that check them. First the .lorvel/ customisation it reads, with the loader: the settings in the frontmatter, then the sections in the body. Then, in the eight cases from `plan-method-read-first` to `plan-change-leaves-the-rest`, how it gets to a plan: the planning method the plugin keeps in one file, and a task that already has a plan. Then, in the four cases at the end, from `check-of-checks-after-review` on, where it puts a check of the checks: a run that breaks the code on purpose, or puts back the code from before the change, to see whether a check goes red. They cover only those parts of the command. Same shape and same caveats as task-create.json: read them by hand, and see its `runner` note for why this is not the shape `claude plugin eval` executes.",
   "cases": [
     {
       "id": "no-customisation-unchanged",
@@ -159,7 +159,7 @@
       "context": "`.lorvel/task-work.md` has two sections: `## after: review` asking for one observable action once the review is done (running a harmless command that prints a marker), and `## before: hand-over` asking for one line with a second marker in the hand-over summary. The run is not given `--auto`.",
       "expected_behavior": [
         "The first reply lists `after: review (Phase 4)` and `before: hand-over (Phase 5)`, each with `.lorvel/task-work.md` as its source, and not their text.",
-        "Once the review and its gates are done, the run does what the `after: review` section asks — the command with the first marker runs after the review, not before it.",
+        "Once phase 4 is done, which for this task is the review and its gates, the run does what the `after: review` section asks: the command with the first marker runs after the review, not before it.",
         "The hand-over summary at phase 5 carries the line the `before: hand-over` section asks for: a section read at the start of the run is still applied at the far end of it.",
         "STOP-3 still waits: sections add steps, they do not stand in for approval."
       ],
@@ -322,7 +322,7 @@
     },
     {
       "id": "plan-change-leaves-the-rest",
-      "query": "/lorvel:task-work AB-12, run from the same plugin path and in the same folder on the last version that carried its own list of plan headings, and on this one",
+      "query": "/lorvel:task-work AB-12, run from the same plugin path and in the same folder on the last version that carried its own list of plan headings, and on the first one without it",
       "context": "Compare what the model is given, not what it does: the rendered text of the command in each run's transcript, and each file under `skills/task-work/reference/` as the Read tool returns it.",
       "expected_behavior": [
         "The rendered command text differs in two lines only: the row of the phase 0 table for a task that already has a plan, and the phase 2 row of the phase map.",
@@ -330,6 +330,53 @@
         "One file says how to get to a plan, `reference/plan-method.md`. `SKILL.md` and `reference/planning.md` keep the order of the phases and their gates, and point to it. The list of headings this command used to carry is in no file."
       ],
       "success_criteria": "PASS = a diff of the two renders showing exactly those two lines, and no diff for the three other reference files. FAIL = any other line of the render changed, or a second file that says how to write a plan."
+    },
+    {
+      "id": "check-of-checks-after-review",
+      "query": "/lorvel:task-work AB-12 — a task in `in_progress` whose plan is settled and whose log says nothing about implementing, so the run enters at phase 3",
+      "context": "Two steps of the plan each name, as their check, a run that is a check of the checks. One is a mutation pass: break the code on purpose, one break at a time, and see the new tests go red. The other is a negative baseline: put back the code from before the change and see the new tests fail. Both runs find nothing to fix. The repository's only gate is its test command. Review tooling is in the session, or the run reviews the change itself as phase 4 says when there is none.",
+      "expected_behavior": [
+        "Phase 3 builds the change and runs the repository's gates, and makes neither of the two runs: no command breaks the code on purpose or puts the old code back before the review. The log says which two runs are owed.",
+        "Phase 4 gets the review and lets it apply what it finds, then runs every gate again.",
+        "Only then are the two owed runs made, each once, on the code as the review and those gates left it, and before the hand-over summary of phase 5.",
+        "Before the first of them the run keeps a copy of the code, and after the last it puts exactly that code back and checks it against the copy: nothing of a break or of the old code goes into the hand-over."
+      ],
+      "success_criteria": "PASS = in the transcript the review comes before the first command that breaks the code or puts the old code back, the gates run again between the review and that command, each of the two runs is made once, and after the last of them the code is checked against a copy kept before the first. FAIL = either run made before the review, either run made both before and after it, an owed run never made, or a break or old code left in what is handed over."
+    },
+    {
+      "id": "check-of-checks-not-invented",
+      "query": "/lorvel:task-work AB-12, then `/lorvel:task-work AB-13` — two tasks in `in_progress` with a settled plan, each entering at phase 3",
+      "context": "First task: neither its plan nor the project's knowledge asks for a run that breaks the code or puts the old code back. Second task: its plan has a test written first and seen failing before the code is written, and asks for nothing else of that kind. Read it beside the same two tasks run on the version before this change: a run that makes such a check on its own account there too is no failure here.",
+      "expected_behavior": [
+        "First run: at no phase does a command break the code on purpose, or put the old code back, to see whether a check goes red. Phase 4 is the review, then every gate again, and phase 5 follows: the command says where a check of the checks goes, it does not ask for one.",
+        "Second run: the test is written and seen failing in phase 3, before the code. It is not held back as owed, and after the review nothing is put back to see it fail a second time.",
+        "Neither run logs a check of the checks as owed, and neither reports one as skipped."
+      ],
+      "success_criteria": "PASS = in neither transcript a command that breaks the code, or puts the old code back, to see whether a check goes red, and in the second the test seen failing before the code is written. FAIL = a mutation pass or a negative baseline nobody asked for, or the test written first held back until after the review."
+    },
+    {
+      "id": "check-of-checks-then-a-fix",
+      "query": "/lorvel:task-work AB-12, then `/lorvel:task-work AB-13 --auto` — two tasks whose plans each owe a mutation pass; both runs reach the end of phase 4",
+      "context": "First task: the pass shows a break that no test catches, and what the run changes because of it is a test, no product code. Second task: what the pass turns up is a fault in the product code, and the run fixes it there.",
+      "expected_behavior": [
+        "First run: the test is added or corrected, every gate runs again, and the run goes on to phase 5. The change is not reviewed a second time.",
+        "Second run: the fix to the product code has not been reviewed, so it is reviewed the way the change was, then every gate runs again, before the hand-over summary.",
+        "`--auto` does not shorten the second run: nothing is committed while the fix is unreviewed.",
+        "In neither run is the mutation pass made again from the start.",
+        "In both runs the log says what the pass found."
+      ],
+      "success_criteria": "PASS = in the first run no second review, and the gates run again after the test changed; in the second a review after the fix to the product code and before any commit, with the gates run again after it; and in neither run the pass made again from the start. FAIL = a fix to the product code committed unreviewed, a gate not run again after either fix, a second review of a fix that touched only a test, or the pass made again from the start."
+    },
+    {
+      "id": "check-of-checks-ends-phase-4",
+      "query": "/lorvel:task-work AB-12 — a task whose plan owes a mutation pass; the run goes from phase 3 to phase 5",
+      "context": "`.lorvel/task-work.md` has one section, `## after: review`, asking for a harmless command that prints a marker. The pass finds nothing to fix. The run is not given `--auto`.",
+      "expected_behavior": [
+        "The first reply lists `after: review (Phase 4)` with `.lorvel/task-work.md` as its source, and not its text.",
+        "Phase 4 runs the review, then every gate again, then the owed pass. The command with the marker runs after all three: phase 4 is done only once the pass is.",
+        "Phase 5 follows, and STOP-3 still waits."
+      ],
+      "success_criteria": "PASS = the marker in the transcript after the last command of the pass and before the hand-over summary, quoted. FAIL = the marker between the gates and the pass, or the pass made after it."
     }
   ],
   "public_safe": true,

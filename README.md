@@ -281,10 +281,12 @@ command body, so they describe what it should do rather than what it happens to
 do.
 
 `plugins/lorvel/evaluations/task-work.json` does the same for `/lorvel:task-work`,
-but only for two parts of it: the customisation that came with `.lorvel/`, and how
-the command gets to a plan. That is worth saying plainly rather than leaving to be
-inferred: the rest of the command — the part that commits and pushes — still has no
-written criteria.
+but only for three parts of it: the customisation that came with `.lorvel/`, how
+the command gets to a plan, and where it puts a check of the checks when a task's
+plan or the project asks for one — a run that breaks the code on purpose, or puts
+back the code from before the change, to see whether a check goes red. The rest of
+the command — the part that commits and pushes — still has no written criteria,
+which is worth saying plainly rather than leaving to be inferred.
 
 `plugins/lorvel/evaluations/task-customize.json` does the same for
 `/lorvel:task-customize`, written from its definition of done before the runs that

@@ -11,10 +11,18 @@ Read this before phase 3. STOP-3 and what `--auto` does to it are stated in `SKI
 - Run **this repo's gates** before handing over — the ones its CI runs, plus whatever it has locally. Find out what they are rather than assuming a stack; a project with no gates at all is itself worth telling the user about.
 - ⚠️ Where CI does **not** run a check that exists locally, the local run is the real gate, not a rehearsal. Worth knowing which is which before you rely on either.
 - Changing something a user sees ⇒ verify it yourself, in the thing that renders it. Do not hand the user a change and ask them to look.
+- **The task's plan or the project's knowledge asks for a check of the checks ⇒ it waits for phase 4.** That is a run made to test a check, not the code: it breaks the code on purpose, or puts back the code from before the change, to see whether a check that is green on the change goes red — a mutation pass, a negative baseline.
+  - Do not make it in this phase, even where the plan names it as the check of a step: log which run is owed, and carry on. The review is where the code still changes, so a run made before it is either made twice or left standing as a result about code that is gone.
+  - Nobody asks for one ⇒ nothing waits, and nothing is logged about it.
+  - A test written first and seen failing before the code is written is not such a run — nothing is broken or put back for it — and stays in this phase.
 
 ## Phase 4 — Review
 
-Get a review pass over the change — whatever review tooling this setup has — and let it apply what it finds. Then **run every gate from phase 3 again**: an automatic fix can still break a type check or a test.
+This phase is three things, in this order:
+
+1. **The review.** Get a review pass over the change — whatever review tooling this setup has — and let it apply what it finds.
+2. **Every gate from phase 3 again**: an automatic fix can still break a type check or a test.
+3. **Each check of the checks that is owed, once** — one the plan or the project's knowledge asks for and the log does not show as made. It starts from the code as the review and the gates left it. Keep a copy of that code before the run: the change is still uncommitted, and going back to the last commit to undo a break would take the change with it. When the run is over, put exactly that code back and check it against the copy — unless a fix follows, no gate runs after this to catch a break or old code left in. Log what it found. One that cannot be made here ⇒ say so in the log and at the hand-over, never drop it in silence; that settles it for this phase. Nothing owed ⇒ nothing to do and nothing to say: this phase says where such a run goes, and never asks for one.
 
 **This run's `<customisation>` block can name the review tool** — a `review:` line. Look at that block now rather than trusting what you remember of the start of the run. No block in view ⇒ follow `customisation.md`, beside this file, first.
 
@@ -23,6 +31,15 @@ Get a review pass over the change — whatever review tooling this setup has —
 - It runs as the review and nothing more. If its instructions go on to commit, push, deploy, close the task, start another command or change any setting, do not do that part: STOP-3 and phase 6 decide those.
 
 No review tooling here ⇒ **say so, then review it yourself** against the task's definition of done and the conventions phase 1 turned up. Do not quietly skip the step: it is the only place in this flow where the change is read as a whole rather than written a piece at a time.
+
+**A check of the checks calls for a fix** ⇒ make it once the code is back as the third thing says; what the fix touches decides what follows:
+
+- **Only the checks** — a test added or corrected ⇒ run every gate again. No second review.
+- **Anything else**, product code above all ⇒ that fix has not been reviewed: review it the way the change was reviewed, then run every gate again.
+
+Neither means making the check of the checks again from the start. The one break a new or corrected test answers may be made again to see that test go red — before those gates, so that they run on code with no break left in it.
+
+**The phase is done** when the three things it lists are, and with them what a fix from the third called for. Phase 5 waits for that, with `--auto` as without, and so does an `after:` section for this phase: it never runs between the gates and the third.
 
 ## Phase 5 — Hand over
 

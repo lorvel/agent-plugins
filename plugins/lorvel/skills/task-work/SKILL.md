@@ -14,7 +14,7 @@ metadata:
       - {id: plan, kind: step, mode: extend, what: "Phase 2 — write the plan, or keep the one the task already has, and move the task to `in_progress`"}
       - {id: STOP-2, kind: gate, in: [plan], mode: locked, what: "At the end of phase 2 — wait for the plan to be approved; on with `--plan` or a `.lorvel/` default, off for one run with `--no-plan`"}
       - {id: implement, kind: step, mode: extend, what: "Phase 3 — build it, log as you go, run the repo's gates"}
-      - {id: review, kind: step, mode: extend, what: "Phase 4 — a review pass, then every gate again"}
+      - {id: review, kind: step, mode: extend, what: "Phase 4 — a review pass, every gate again, then, where the plan or the project asks for one, a run that breaks the code, or puts the old code back, to see a check go red"}
       - {id: hand-over, kind: step, mode: extend, what: "Phase 5 — summarise, move to code done, not yet live"}
       - {id: STOP-3, kind: gate, in: [hand-over], mode: locked, what: "At the end of phase 5 — wait for the diff to be approved; `--auto` drops the wait, not the machine gates"}
       - {id: ship, kind: step, mode: extend, what: "Phase 6 — commit and push, verify it live, audit the knowledge, close, point to what is next"}
@@ -158,7 +158,7 @@ ones you skipped past.
 | **1** Read and analyse | The task, the knowledge, the code — then what is still unclear. Ends at **STOP-1**. | `reference/planning.md` |
 | **2** Plan | Write the plan the way the plugin's planning method says, or keep the one the task already has; move the task to `in_progress`. **STOP-2** when it is on. | *(same file)* |
 | **3** Implement | Build it, log as you go, run this repo's own gates. | `reference/building.md` |
-| **4** Review | A review pass, then every gate again. | *(same file)* |
+| **4** Review | A review pass, every gate again, then — once, never before the review — any check of the checks the plan or the project's knowledge asks for: a run that breaks the code, or puts the old code back, to see a check go red. | *(same file)* |
 | **5** Hand over | Files changed by repo, move to *code done, not yet live*. Ends at **STOP-3**. | *(same file)* |
 | **6** Ship, verify, close | Push in dependency order, prove it live, audit the knowledge, close on evidence. | `reference/shipping.md` |
 

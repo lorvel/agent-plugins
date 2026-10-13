@@ -130,8 +130,11 @@ the command the file is for, declared with what a customisation may do at each i
 
 - `before:` and `after:` add a step next to any step or gate. A gate keeps its place when
   it is switched off, and GATE-2 of `/lorvel:task-create`, which sits in two steps, runs
-  its sections in both. An `after:` on a command's last step runs before its closing
-  report, which stays last.
+  its sections in both. An `after:` runs once its step is done. For `review` of
+  `/lorvel:task-work` that is the end of phase 4: after the review, after the gates run
+  again, and — where a task's plan or the project asks for one — after a run that breaks
+  the code on purpose, or puts the old code back, to see a check go red. An `after:` on a
+  command's last step runs before its closing report, which stays last.
 - `replace:` puts your text in place of a step's own, where the step allows it — in this
   version, only `classify` of `/lorvel:task-create`. An empty `replace:` counts as a `skip:`.
 - `skip:` drops a step marked optional; its text, if any, says why. No step is optional in

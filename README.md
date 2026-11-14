@@ -48,7 +48,9 @@ or edited, no file in your repository is touched. It does not wait for you to ap
 the plan either: you read it once it is saved, and rewrite or remove it if it is wrong.
 A task that already has a plan is not overwritten without your yes — the command asks
 first, before it reads the knowledge base or the code, because saving a plan replaces the
-one before and nothing keeps the old text.
+one before and nothing keeps the old text. Typed with no task named, it proposes the task
+created last in the same conversation, and plans it only once you say that is the one; when
+the conversation has created none, it asks which task you mean.
 
 How `/lorvel:task-plan` and `/lorvel:task-work` get to a plan is in one file,
 `plugins/lorvel/skills/task-work/reference/plan-method.md`: what to read first, what to

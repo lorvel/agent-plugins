@@ -17,7 +17,7 @@ KINDS = %w[step gate rule]
 LOCKED = {
   "task-work" => %w[STOP-1 STOP-2 STOP-3 missing-tools machine-gates no-undo close-on-evidence knowledge-audit no-secrets loader-only],
   "task-create" => %w[GATE-1 GATE-2 ask recheck no-one-to-ask no-secrets loader-only],
-  "task-plan" => %w[GATE-1 GATE-2 ask plan-only no-one-to-ask no-secrets],
+  "task-plan" => %w[GATE-1 GATE-2 GATE-3 ask plan-only no-one-to-ask no-secrets],
 }
 REPLACE = { "task-work" => [], "task-create" => %w[classify], "task-plan" => [] }
 # The commands a .lorvel/ file can customise: the loader knows these two names and no other, and
@@ -30,7 +30,7 @@ STEP_LABEL = { "task-create" => "Step 1 — ", "task-plan" => "Step 2 (optional)
 # The one file that says how to get to a plan, as task-plan names it: ${CLAUDE_PLUGIN_ROOT} is
 # replaced in the body of a SKILL.md, so that command can point there from another skill's folder.
 METHOD_POINTER = "${CLAUDE_PLUGIN_ROOT}/skills/task-work/reference/plan-method.md"
-PUBLISHED = { "task-plan" => %w[locate GATE-1 GATE-2 read ask write report plan-only no-one-to-ask no-secrets] }
+PUBLISHED = { "task-plan" => %w[locate GATE-1 GATE-2 GATE-3 read ask write report plan-only no-one-to-ask no-secrets] }
 LOADER_RULE = 'Bash("${CLAUDE_PLUGIN_ROOT}/scripts/lorvel-load" *)'
 HEREDOC = "<<'LORVEL_SESSION_FOLDER'"
 # The line the loader prints when there is nothing to apply; task-work and task-create quote it,
@@ -203,13 +203,19 @@ end
     when_to_use = front["when_to_use"].to_s
     fail("#{skill}: when_to_use lacks one of its two sides") unless when_to_use.include?("Use when") && when_to_use.include?("Do NOT use it")
     fail("#{skill}: runs a command before the model reads it") unless bang_blocks.zero? && inline_bangs.zero?
-    # An ID is public from the commit that declares it: these ten are the ones this command was
-    # published with, and none of them may go. The question about a plan the task already has is
-    # asked in step 1, before the reading.
+    # An ID is public from the commit that declares it: these are the ones this command has
+    # published, and none of them may go. Both of its questions about which task and which plan —
+    # whether to replace the plan the task already has, and whether the task a bare call proposes is
+    # the one to plan — are asked in step 1, before the reading.
     gone = PUBLISHED[skill] - ids
     fail("#{skill}: IDs gone: #{gone}") unless gone.empty?
-    gate_2 = rows.find { |r| r["id"] == "GATE-2" } || {}
-    fail("#{skill}: GATE-2 sits in #{gate_2["in"].inspect}, not in step 1") unless gate_2["in"] == %w[locate]
+    %w[GATE-2 GATE-3].each do |gate|
+      row = rows.find { |r| r["id"] == gate } || {}
+      fail("#{skill}: #{gate} sits in #{row["in"].inspect}, not in step 1") unless row["in"] == %w[locate]
+    end
+    # A bare call proposes only a task this conversation created; it never picks one, and never
+    # looks one up on the server.
+    fail("#{skill}: lacks the rule against picking or looking up a task") unless body.include?("Never pick a task yourself, and never go looking for one: no `list_tasks`, no `search_tasks`.")
     # It holds no planning method of its own: it names the one file, and the section of the guide
     # that says what a plan holds.
     fail("#{skill}: does not point to the planning method") unless body.include?("`#{METHOD_POINTER}`")

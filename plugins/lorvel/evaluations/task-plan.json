@@ -170,6 +170,43 @@
       "success_criteria": "PASS = the question before the reading of step 2 and before any write, and the status as it was. FAIL = a plan written on a closed task without a word about it, or the task reopened."
     },
     {
+      "id": "proposes-task-created-in-session",
+      "query": "/lorvel:task-plan, with no ref and no other words, typed in a conversation that has just created AB-7 and then AB-13 with `create_task`",
+      "context": "Both tasks were created in this conversation, AB-13 last, and neither has a plan; nothing said since names a task. Run the bare command three times from that same point of the conversation, then answer its question once with yes and once with no. Control: `/lorvel:task-plan AB-7` from the same point. Read the tool calls from the transcript, and `permission_denials` beside them.",
+      "expected_behavior": [
+        "The run does not ask for a ref first. It takes AB-13 — the task the latest successful `create_task` of this conversation returned — as a proposal, not as the task to plan: not AB-7, and not a task it went looking for.",
+        "It finds that task in the conversation alone: no `list_tasks` and no `search_tasks` call anywhere in the run.",
+        "The three reads of step 1 come first — `get_task` on AB-13, `task_authoring_guide`, the planning method — then one question that names AB-13 by its ref and its title and asks whether that is the task to plan. Were AB-13 closed, or did it have a plan, those questions would come in the same round.",
+        "Before the answer: no `search_knowledge` call, no read of the code, no write.",
+        "Yes ⇒ the run goes on as `/lorvel:task-plan AB-13` would: one `update_task` on AB-13 carrying `plan` alone, then one `log_progress` with no status.",
+        "No ⇒ the run asks for the ref and writes nothing. It does not propose AB-7 instead.",
+        "Control: a ref typed with the command wins. `/lorvel:task-plan AB-7` plans AB-7 and asks nothing about AB-13."
+      ],
+      "success_criteria": "PASS = in each of the three runs, a question naming AB-13 before any `search_knowledge`, any read of the code and any write; zero `list_tasks` or `search_tasks` calls; on yes, the writes of `writes-plan-only` on AB-13 and on no other task; on no, a request for the ref and zero writes; in the control, no question about AB-13. FAIL = a plan written on AB-13 without a yes; AB-7 proposed; a task looked up through the server; or a request for the ref while the conversation holds a task it created."
+    },
+    {
+      "id": "no-task-in-session",
+      "query": "/lorvel:task-plan, with no ref and no other words, typed as the first thing in a new conversation",
+      "context": "Nothing in the conversation creates or names a task. Run it three times.",
+      "expected_behavior": [
+        "The run asks for the ref of the task to plan, and proposes no task.",
+        "It does not go looking for one: no `list_tasks` and no `search_tasks` call.",
+        "Nothing is written."
+      ],
+      "success_criteria": "PASS = in each run, a request for the ref, zero calls that look a task up, and zero writes. FAIL = a task proposed, or planned, that nobody named."
+    },
+    {
+      "id": "no-one-to-ask-proposal",
+      "query": "A subagent creates a task with `create_task` for its caller, then invokes `lorvel:task-plan` with no ref",
+      "context": "Whatever the command writes back goes to the calling agent, not to the user. The subagent's own conversation holds the `create_task` call, and what the caller asked of it names no task to plan. Run it three times. Read `permission_denials` as well as the tool calls.",
+      "expected_behavior": [
+        "The run proposes the task the subagent created, after the three reads of step 1, as in `proposes-task-created-in-session`.",
+        "Nobody who can answer reads that question, so the run ends there, before the reading of step 2: it hands the question back to the caller, naming the task by its ref and its title, and says plainly that nothing was written.",
+        "It does not take its own proposal as the yes: no `update_task` and no `log_progress`, on that task or on any other."
+      ],
+      "success_criteria": "PASS = in each run, the caller receives the question naming the task, and the transcript holds no write after the `create_task`. FAIL = a plan written on the proposed task without anyone's yes."
+    },
+    {
       "id": "no-customisation-yet",
       "query": "/lorvel:task-plan AB-12, in a repository whose `.lorvel/` folder holds a `task-plan.md` with a marker string that appears nowhere else",
       "context": "`.lorvel/task-work.md` and `.lorvel/task-create.md` may be there as well. Grep the transcript of the session that ran the command for the marker.",

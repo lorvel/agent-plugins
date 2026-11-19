@@ -311,14 +311,15 @@
     {
       "id": "plan-maps-slices",
       "query": "/lorvel:task-work AB-12 --plan — a task not yet started whose body asks for two things that could each ship without the other; then a second run on the same task once its plan is saved",
-      "context": "At STOP-1 the user answers the question about splitting with \"split it\". No subtask is created between the two runs.",
+      "context": "At STOP-1 the user answers the question about splitting with \"split it\". No subtask is created between the two runs. The project's knowledge base holds no convention on how to split work or how to name slices.",
       "expected_behavior": [
         "STOP-1 asks whether to split the work or keep it as one, with the answer the run would recommend.",
         "The plan it shows has one step per slice, in the order the slices depend on one another, and creates no subtask.",
+        "By the time it recommends an answer to the question about splitting, the run has read the slicing method, `slice-method.md` beside the planning method, with the Read tool, and the map follows it: each slice has a name saying what it is, says what it delivers, which slice or slices it waits on — `none` when it waits on nothing — and which lines of the definition of done it proves; every line of the definition of done has exactly one owner, a slice or the task itself, which the map says keeps it; no slice comes before a slice it waits on; and no slice name carries an ordering prefix.",
         "Once approved, and not before, the plan is saved with `update_task` alone: no `log_progress` moves the status, and the note of the one that is written says the plan maps slices and is not to be built from. The run stops and says the slices are the user's to create.",
         "The second run finds the task not started and with a plan, goes through phase 1, keeps the plan, moves no status, and stops again: it builds nothing from a map of slices."
       ],
-      "success_criteria": "PASS = in the first run: the question about splitting; a plan whose steps are the slices; no write before the approval; then one `update_task` carrying `plan` and no status move. In the second: the plan left as it is, no status move and no file changed. FAIL = the task moved to `in_progress`, a subtask created, the plan saved before it was approved or replaced by the second run, or a run that starts building from the map."
+      "success_criteria": "PASS = in the first run: the question about splitting; a `Read` of `slice-method.md` before the plan is shown; a plan whose steps are the slices, cut and written as that file says; no write before the approval; then one `update_task` carrying `plan` and no status move. In the second: the plan left as it is, no status move and no file changed. FAIL = `slice-method.md` not read, a slice with no waits-on line, a line of the definition of done with no owner or with two, a slice ahead of one it waits on, an ordering prefix in a slice name, the task moved to `in_progress`, a subtask created, the plan saved before it was approved or replaced by the second run, or a run that starts building from the map."
     },
     {
       "id": "plan-change-leaves-the-rest",

@@ -51,7 +51,7 @@ No task to read yet — a bare call that has to ask for the ref — ⇒ ask in t
 **The `plan` of that one task, and one log entry on it.** Nothing else:
 
 - **No status moves** — not this task's, not its parent's.
-- **No other task is created or edited.** No subtask either, even when the plan maps slices: creating them is the user's to do.
+- **No other task is created or edited.** No subtask either, even when the plan maps slices: `/lorvel:task-split` creates them, once the user approves the split.
 - **No file of the repository is changed.**
 - **No start on the work**: no code, no branch, no commit. Finishing step 5 is the end of the command.
 

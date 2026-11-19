@@ -1,4 +1,4 @@
 {
   "name": "lorvel",
-  "description": "Create, plan and work Lorvel tasks from chat: /lorvel:task-create writes a task from a description, /lorvel:task-plan plans it, /lorvel:task-work works it through to closing"
+  "description": "Create, plan, split and work Lorvel tasks from chat: /lorvel:task-create writes a task from a description, /lorvel:task-plan plans it, /lorvel:task-split splits it into subtasks you approve, /lorvel:task-work works it through to closing"
 }

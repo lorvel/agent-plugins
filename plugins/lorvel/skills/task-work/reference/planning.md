@@ -32,7 +32,7 @@ Where `SKILL.md` and this file say to write or save the plan, they mean a plan t
 - **An answer changed the approach or a step** ⇒ the guide says a plan is rewritten when the approach changes. Rewrite the lines that answer changed, in place, and nothing else — no other line re-worded, added or dropped: a plan is replaced whole, so what you do not send back is gone. Say which lines changed, then save it as steps 1 and 3 say.
 - **The user asks for a new plan in this run** ⇒ write one, as for a task with none.
 
-**The plan maps slices instead of the work itself**, because the user chose to split it ⇒ in either case this run builds nothing and moves no status. A plan this run wrote or changed is saved with `update_task` alone. What STOP-1 settled goes into a `log_progress` note that carries no status and says the plan maps slices and is not to be built from, so a later run reads that in the log. Stop and say so: the slices are the user's to create, and each is worked by a run of its own.
+**The plan maps slices instead of the work itself**, because the user chose to split it ⇒ in either case this run builds nothing and moves no status. A plan this run wrote or changed is saved with `update_task` alone. What STOP-1 settled goes into a `log_progress` note that carries no status and says the plan maps slices and is not to be built from, so a later run reads that in the log. Stop and say so: the slices are created by `/lorvel:task-split`, once the user approves the split, and each is worked by a run of its own.
 
 **Links.** Inside Lorvel fields — the plan, a log note — use `lorvel://task/<ref>`; when talking to the user, link the `url` from the response instead: `lorvel://` is a dead link in chat.
 

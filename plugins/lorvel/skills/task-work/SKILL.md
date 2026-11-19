@@ -1,6 +1,6 @@
 ---
 name: task-work
-description: Step 3 — work one Lorvel task end to end, with stop gates
+description: Step 4 — work one Lorvel task end to end, with stop gates
 argument-hint: <task-ref> [--plan] [--no-plan] [--auto]
 disable-model-invocation: true
 allowed-tools: Bash("${CLAUDE_PLUGIN_ROOT}/scripts/lorvel-load" *)

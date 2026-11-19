@@ -20,20 +20,24 @@ claude plugin install lorvel@lorvel-plugins
 |---|---|
 | `/lorvel:task-create` | Turns a one-line description into a Lorvel task, checking for duplicates and asking for what's missing before it writes. There is no draft to approve: edit or drop the task if it came out wrong. |
 | `/lorvel:task-plan` | Writes the plan of a task that already exists, and stops there: it reads the task, the knowledge and the code, asks what cannot wait, and saves the plan on the task. It changes no status and starts no work. Optional: `/lorvel:task-work` plans for itself. |
+| `/lorvel:task-split` | Splits a task that already exists into subtasks: it shows you the slices, what each one waits on and which line of the definition of done it proves, and creates them only once you approve. It writes no plan and changes no status. Optional: most tasks need no split. |
 | `/lorvel:task-work` | Works one task from reading it through to closing it: analyse, plan, implement, review, ship, audit the knowledge, close. Stop gates before planning and before committing. |
 | `/lorvel:task-customize` | Writes this repository's customisation of `/lorvel:task-create` and `/lorvel:task-work`, in `.lorvel/`: shows where each can be changed, asks what you want, checks it, and shows the flow once it applies. |
 
-`/lorvel:task-create` and `/lorvel:task-plan` need a connected Lorvel MCP server
-they can write to. Each checks up front that the tools are there and stops if they
-aren't, rather than writing a malformed task or a plan from memory.
+`/lorvel:task-create`, `/lorvel:task-plan` and `/lorvel:task-split` need a connected
+Lorvel MCP server they can write to. Each checks up front that the tools are there and
+stops if they aren't, rather than writing a malformed task or a plan from memory.
 
-You don't have to type `/lorvel:task-create` or `/lorvel:task-plan`: ask Claude
-in plain words for a task, or to plan a task you name, and it will usually run the
-same command — type it when you want to be sure. Another agent working for
-you can run them too. Each is written to run only when someone asks for what it
-does, never because Claude decided that something deserves a task or that a task
-needs a plan. If one needs to ask you something and the agent running it can't
-reach you, it hands the questions back to that agent and writes nothing.
+You don't have to type `/lorvel:task-create`, `/lorvel:task-plan` or
+`/lorvel:task-split`: ask Claude in plain words for a task, to plan a task you name or to
+split it into subtasks, and it will usually run the same command — type it when you want
+to be sure. Another agent working for you can run them too. Each is written to run only
+when someone asks for what it does, never because Claude decided that something deserves
+a task, that a task needs a plan or that it should be split. If one needs to ask you
+something and the agent running it can't reach you, it hands the questions back to that
+agent and writes nothing; `/lorvel:task-split` hands back the split it would have shown
+you. Only your own answer, to a run whose reply you read, approves a split: an approval
+another agent passes on does not.
 `/lorvel:task-work` and `/lorvel:task-customize` still run only when you type them.
 
 `/lorvel:task-work` assumes your setup already has a way to review a change and a
@@ -52,22 +56,33 @@ one before and nothing keeps the old text. Typed with no task named, it proposes
 created last in the same conversation, and plans it only once you say that is the one; when
 the conversation has created none, it asks which task you mean.
 
+`/lorvel:task-split` turns a task into subtasks, and nothing else: it creates the slices
+you approve, in their order, and writes one entry in the task's log listing them. No
+subtask is created before you approve the split it shows you — no flag or setting turns
+that off — and no subtask that already exists is edited or closed. When the task's plan
+already maps slices, the split holds them as mapped and proposes a fix wherever the map
+breaks the slicing method; otherwise it reads the task, the knowledge and the code and cuts
+the work itself, or tells you the work is better kept as one task. For a task that already
+has subtasks, it asks first whether to stop there or add slices, and proposes only the
+slices still missing; one that a subtask still to do waits on is put before it. Pointed at
+a subtask, it says why a subtask cannot be split, and stops.
+
 How `/lorvel:task-plan` and `/lorvel:task-work` get to a plan is in
 `plugins/lorvel/skills/task-work/reference/plan-method.md`: what to read first, what to
 ask before writing, and a few finer rules for writing the steps. When you choose to split
 the work, the plan maps its slices instead, and how they are cut is in a second file beside
 it, `slice-method.md`: when to split, one outcome per slice, their order and what each one
 waits on, and who owns each line of the definition of done — a slice, or the task itself.
-Your project's own conventions on splitting, found in its knowledge base, win over that
-file. What a plan is — its parts, which of them are always there — is not in the
+`/lorvel:task-split` cuts by the same file. Your project's own conventions on splitting,
+found in its knowledge base, win over that file. What a plan is — its parts, which of them are always there — is not in the
 plugin: it comes from
 `task_authoring_guide`, like the shape of a task. `/lorvel:task-work` keeps a plan the
 task already has when it starts, whoever wrote it. It works from that plan instead of
 writing another: it rewrites a line of it only where your answer to one of its questions
 changes a step or the approach, and writes a new plan only if you ask for one.
 
-`/lorvel:task-create`, `/lorvel:task-plan` and `/lorvel:task-work` carry **sequence,
-not shape**. What is specific to a project — its
+`/lorvel:task-create`, `/lorvel:task-plan`, `/lorvel:task-split` and `/lorvel:task-work`
+carry **sequence, not shape**. What is specific to a project — its
 field rules, its status vocabulary, its conventions — is read at runtime from
 `task_authoring_guide` and `search_knowledge`, so the project's own answers win
 over anything written into these files. That split is deliberate: a procedure that
@@ -76,9 +91,9 @@ hardcodes a project's facts drifts away from them the moment they change.
 ## Customising the commands
 
 A repository can change parts of `/lorvel:task-work` and `/lorvel:task-create` without
-forking the plugin. `/lorvel:task-plan` takes no customisation yet: it declares its
-steps the way those two do, but no file is read for it. The files go in `.lorvel/`, in
-the folder the session was opened in:
+forking the plugin. `/lorvel:task-plan` and `/lorvel:task-split` take no customisation
+yet: they declare their steps the way those two do, but no file is read for either. The
+files go in `.lorvel/`, in the folder the session was opened in:
 
 - `.lorvel/task-work.md` and `.lorvel/task-create.md` — shared: commit them, and the whole
   team gets them.
@@ -305,6 +320,9 @@ checked it.
 `plugins/lorvel/evaluations/task-plan.json` does the same for `/lorvel:task-plan`. Its
 first version was committed before the command existed; half of its cases were then
 revised after the review and the runs that checked the command.
+
+`plugins/lorvel/evaluations/task-split.json` does the same for `/lorvel:task-split`,
+written from its definition of done before the command existed.
 
 They are read by hand. The shape is borrowed from another plugin's evaluations
 and is not the shape `claude plugin eval` executes, which is why they sit in

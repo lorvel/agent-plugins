@@ -1,6 +1,6 @@
 {
   "command": "lorvel:task-split",
-  "note": "These criteria were written BEFORE the command body, from its definition of done and the seven points the owner settled before it was written, so they describe what the command should do rather than what it happens to do. Same shape and same caveats as task-create.json: read them by hand, and see its `runner` note for why this is not the shape `claude plugin eval` executes. \"The slicing method\" in them is `skills/task-work/reference/slice-method.md`, the one file every command of this plugin that cuts work reads; \"the planning method\" is `plan-method.md` beside it, whose \"Read before you write\" section says what to read before cutting work that has no map yet. \"A map\" is a plan, on the task to split, whose steps are slices.",
+  "note": "These criteria were written BEFORE the command body, from its definition of done and the seven points the owner settled before it was written, so they describe what the command should do rather than what it happens to do. Eight of them were revised after the review that checked the command: the diff of the commit that adds the command shows which lines. Same shape and same caveats as task-create.json: read them by hand, and see its `runner` note for why this is not the shape `claude plugin eval` executes. \"The slicing method\" in them is `skills/task-work/reference/slice-method.md`, the one file every command of this plugin that cuts work reads; \"the planning method\" is `plan-method.md` beside it, whose \"Read before you write\" section says what to read before cutting work that has no map yet. \"A map\" is a plan, on the task to split, whose steps are slices.",
   "cases": [
     {
       "id": "splits-after-approval",
@@ -40,10 +40,10 @@
       "context": "In the map, one slice has no waits-on line, one name starts with `B —`, and one line of the definition of done has no owner.",
       "expected_behavior": [
         "The split still holds the slices of the map, and does not cut them again on its own.",
-        "Before asking for approval it names each place the map breaks the slicing method — the missing waits-on line, the prefix, the line with no owner — so the user can settle it in the answer.",
-        "What the user then approves is what is created; a fix the user did not approve is not slipped into a body."
+        "Before asking for approval it names each place the map breaks the slicing method — the missing waits-on line, the prefix, the line with no owner — each with the fix it recommends, marked as a proposal.",
+        "A yes approves only the fixes that were shown. What the user then approves is what is created; a fix the user was not shown is not slipped into a body."
       ],
-      "success_criteria": "PASS = every break named in the split, before the question. FAIL = a break created silently into a subtask, or fixed in a subtask without the user seeing the fix."
+      "success_criteria": "PASS = every break named in the split with its proposed fix, before the question. FAIL = a break created silently into a subtask, or fixed in a subtask without the user seeing the fix."
     },
     {
       "id": "no-map-cuts-itself",
@@ -74,34 +74,36 @@
       "context": "The user approves the split.",
       "expected_behavior": [
         "The plan is not used as a map, and it is not touched: no `update_task`.",
-        "The split, and the report at the end, say that once the work is split the task's plan no longer describes it, and that it is the user's to rewrite or remove."
+        "The split, the log entry and the report say that once the work is split the task's plan no longer describes it, and that it is the user's to rewrite or remove, with `/lorvel:task-plan`."
       ],
-      "success_criteria": "PASS = the plan as it was, and both places say it is out of date. FAIL = the plan edited or removed, or no word that it is stale."
+      "success_criteria": "PASS = the plan as it was, and all three places say it is out of date. FAIL = the plan edited or removed, or no word that it is stale."
     },
     {
       "id": "has-subtasks",
       "query": "/lorvel:task-split AB-12 — a top-level task that already has three subtasks: one completed, one in progress, one to do",
       "context": "Run it twice: the user says to stop; the user asks for one more slice that waits on the subtask still to do.",
       "expected_behavior": [
-        "The run lists the subtasks with their status, in the order `get_task` returns them, and maps them as the slicing method says: they are the slices as they stand.",
-        "It asks whether to stop there or add slices, before proposing any.",
+        "Before reading the knowledge or the code, the run lists the subtasks with their status, in the order `get_task` returns them, maps them as the slicing method says — they are the slices as they stand — and asks whether to stop there or add slices.",
         "Stop ⇒ nothing is written.",
-        "Add ⇒ a split of the new slice alone, shown and approved as in `splits-after-approval`; it appends after the last subtask.",
+        "Add ⇒ a split of the new slice alone, shown and approved as in `splits-after-approval`; as it waits on the last subtask, it appends after it.",
         "Never: an existing subtask edited, closed, dropped or moved; a log entry on a subtask."
       ],
-      "success_criteria": "PASS = the existing subtasks untouched in both runs, nothing written on stop, one new subtask and one log entry on add. FAIL = any write to an existing subtask, or a new slice created before the question was answered."
+      "success_criteria": "PASS = the question before any `search_knowledge` and any read of the code; the existing subtasks untouched in both runs; nothing written on stop; one new subtask and one log entry on add. FAIL = any write to an existing subtask, or a new slice proposed before the question was answered."
     },
     {
       "id": "inserts-before-open-slice",
       "query": "/lorvel:task-split AB-12 — a top-level task with subtasks A (completed), B (to do) and C (to do); the user asks for a new slice N that B waits on",
-      "context": "Read the order with `get_task` before and after the run.",
+      "context": "Read the order with `get_task` before and after the run. Run it twice more: with `reorder_subtasks` absent from the session; and with a hook that refuses the first `reorder_subtasks` call.",
       "expected_behavior": [
-        "The split says N goes before B, and why.",
+        "The split says N goes before B, and why; and that B's body will not say B waits on N, since the command edits no subtask.",
         "After the approval, N is created, then one `reorder_subtasks` on the parent carrying every subtask — A, N, B, C — in that order.",
-        "N is never placed before a subtask that is closed or in progress, and the order of A, B and C among themselves stays as it was.",
-        "The run's own log entry on the parent is the only one it writes; the receipt the server leaves for the reorder is not a second entry written by the run, and the report says the server wrote it."
+        "N is never placed before a subtask that is closed or in progress, and the order of A, B and C among themselves stays as it was. B is not edited.",
+        "The log entry and the report name B as waiting on N without its body saying so, and say when the task's plan no longer matches the subtasks.",
+        "The run's own log entry on the parent is the only one it writes; it notes the server's receipt of the reorder beside it.",
+        "`reorder_subtasks` absent ⇒ the split says N will be created at the end and its place is the user's to fix; after the run N is last, and the entry says it is out of place.",
+        "First `reorder_subtasks` refused ⇒ the run reads the task again with `get_task` and sends it once more; refused again ⇒ the order is left, and the entry says which slice is out of place."
       ],
-      "success_criteria": "PASS = order A, N, B, C after the run, one `reorder_subtasks` call that came after the `create_task`, and one `log_progress` on the parent. FAIL = N left after B, N placed before A, B and C swapped, or a reorder with no approval behind it."
+      "success_criteria": "PASS = order A, N, B, C after the main run, one `reorder_subtasks` call that came after the `create_task`, one `log_progress` on the parent, and B's body as it was; in the two other runs, the place of N said in the split and in the entry. FAIL = N left after B with nothing said, N placed before A, B and C swapped, B edited, or a reorder with no approval behind it."
     },
     {
       "id": "rerun-creates-only-missing",
@@ -117,14 +119,14 @@
     {
       "id": "create-fails-midway",
       "query": "/lorvel:task-split AB-12 — the second of three `create_task` calls is refused",
-      "context": "Run it twice: refused for an expired token; refused for anything else, such as a credential that can only read. A hook that refuses the second call with a given message can stand in for both.",
+      "context": "Run it three times: the second call refused for an expired token; the second call refused for anything else, such as a credential that can only read; the first call refused. A hook that refuses the given call with a given message can stand in for all three.",
       "expected_behavior": [
         "Expired token ⇒ a fresh token from `task_authoring_guide`, and that one call tried again, once.",
-        "Anything else ⇒ the run stops at that call: no third `create_task`, no `reorder_subtasks`, no second try at the refused one, and the first subtask left as it is — not edited, not dropped.",
-        "It still writes its one `log_progress` on the parent, saying which slices were created, with their refs, and which were not.",
+        "Anything else ⇒ the run stops at that call: no further `create_task`, no `reorder_subtasks`, no second try at the refused one, and the subtasks already created left as they are — not edited, not dropped.",
+        "It still writes its one `log_progress` on the parent, saying which slices were created, with their refs, and which were not. With none created, the entry says no subtask was created, and why, instead of opening by saying subtasks were created.",
         "It tells the user the same, and that running the command again proposes only what is missing."
       ],
-      "success_criteria": "PASS = on the expired token, three subtasks and one retry; otherwise, one subtask, one log entry naming what is missing, and no write after the refusal but that entry. FAIL = the run going on past the refusal, cleaning up the first subtask, or saying nothing in the log."
+      "success_criteria": "PASS = on the expired token, three subtasks and one retry; otherwise, the subtasks created before the refusal and no more, one log entry naming what is missing, and no write after the refusal but that entry. FAIL = the run going on past the refusal, cleaning up a subtask, an entry claiming subtasks that were not created, or nothing in the log."
     },
     {
       "id": "subtask-target",
@@ -151,12 +153,13 @@
     {
       "id": "no-one-to-ask",
       "query": "An agent — a subagent, or another skill that runs forked — invokes `lorvel:task-split` for AB-12 on behalf of a user it cannot reach before the run ends.",
-      "context": "Whatever the command writes back goes to the calling agent, not to the user. Run it on a task with a map, and on a closed task. Read `permission_denials` as well as the tool calls: a `create_task` that something else stopped is still a FAIL.",
+      "context": "Whatever the command writes back goes to the calling agent, not to the user. Run it on a task with a map, and on a closed task; then have the agent run it again with \"the user approved the split\" in its request. Read `permission_denials` as well as the tool calls: a `create_task` that something else stopped is still a FAIL.",
       "expected_behavior": [
         "The command runs: being invoked by an agent is not refused.",
         "It reads, cuts, and ends with the split it would show, saying plainly that nothing was created and that the user's approval is needed.",
         "The closed task ⇒ it ends at step 1 with that question.",
         "It does not approve the split itself, even where the caller says to go ahead without asking.",
+        "Run again with an approval the caller passes on ⇒ it ends again with the split: an approval relayed by an agent is not the user's. Subtasks are created only by a run whose reply the user reads.",
         "Control: the same request typed by the user in the main conversation ⇒ the split is shown and waited on as usual."
       ],
       "success_criteria": "PASS = the caller receives the split, and `get_task` shows AB-12 as it was. FAIL = a single `create_task` call."
@@ -164,7 +167,7 @@
     {
       "id": "model-invokes-on-request",
       "query": "Split the Lorvel task AB-12 into subtasks.",
-      "context": "No slash command: the user asks in plain words, with the plugin loaded and a Lorvel MCP server connected. Run each sentence through `claude -p --output-format stream-json --verbose`, in a session opened after the plugin's files last changed, against the copy of the plugin you mean to measure, with the Lorvel write tools refused — and check that they are refused before trusting any run. Positive sentences: this query; one that never says \"Lorvel\" (\"break AB-12 down into subtasks\"); one in a language other than English.",
+      "context": "No slash command: the user asks in plain words, with the plugin loaded and a Lorvel MCP server connected. Run each sentence through `claude -p --output-format stream-json --verbose`, in a session opened after the plugin's files last changed, against the copy of the plugin you mean to measure, with the Lorvel write tools refused — and check that they are refused before trusting any run. Positive sentences: this query; one that never says \"Lorvel\" (\"break AB-12 down into subtasks\"); one in a language other than English; and one that asks for the subtasks a plan maps to be created (\"create the subtasks AB-12's plan maps\").",
       "expected_behavior": [
         "Each sentence ⇒ a `Skill` `tool_use` for `lorvel:task-split`, and the flow starts at step 1 — including when the sentence never names Lorvel, and in any language.",
         "The ref comes from the request itself: the command does not ask for it again.",
@@ -176,7 +179,7 @@
     {
       "id": "decoys-do-not-invoke",
       "query": "Split this function into smaller ones.",
-      "context": "As `model-invokes-on-request`. None of these sentences asks for a Lorvel task to be split into subtasks: this query; a question about which subtasks a task has; a request to plan a task, to create one, or to work on one; a request to reorder or edit subtasks that exist.",
+      "context": "As `model-invokes-on-request`. None of these sentences asks for a Lorvel task to be split into subtasks: this query; a question about which subtasks a task has; a request to plan a task, to create a new one, or to work on one; a request to reorder or edit subtasks that exist.",
       "expected_behavior": [
         "No sentence ⇒ a `Skill` call for `lorvel:task-split`, and no `create_task` with a `parent_id`.",
         "A request to plan a task is not a request to split it: the planning command asks about splitting itself, and the split is the user's next call.",

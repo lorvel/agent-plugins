@@ -1,7 +1,7 @@
 # encoding: utf-8
 # Checks the step IDs each SKILL.md declares under metadata.lorvel.ids against the skill's own text,
-# how task-work and task-create run the .lorvel/ loader, and that task-plan, which takes no
-# customisation yet, does not. See plugins/lorvel/ids.md.
+# how task-work and task-create run the .lorvel/ loader, and that task-plan and task-split, which
+# take no customisation yet, do not. See plugins/lorvel/ids.md.
 # Run from anywhere: ruby tests/ids.test.rb
 
 require "yaml"
@@ -18,19 +18,28 @@ LOCKED = {
   "task-work" => %w[STOP-1 STOP-2 STOP-3 missing-tools machine-gates no-undo close-on-evidence knowledge-audit no-secrets loader-only],
   "task-create" => %w[GATE-1 GATE-2 ask recheck no-one-to-ask no-secrets loader-only],
   "task-plan" => %w[GATE-1 GATE-2 GATE-3 ask plan-only no-one-to-ask no-secrets],
+  "task-split" => %w[GATE-1 GATE-2 GATE-3 GATE-4 propose split-only no-one-to-ask no-secrets],
 }
-REPLACE = { "task-work" => [], "task-create" => %w[classify], "task-plan" => [] }
+REPLACE = { "task-work" => [], "task-create" => %w[classify], "task-plan" => [], "task-split" => [] }
 # The commands a .lorvel/ file can customise: the loader knows these two names and no other, and
-# task-customize writes for them alone. task-plan declares its IDs like them, but nothing applies a
-# customisation to it yet.
+# task-customize writes for them alone. task-plan and task-split declare their IDs like them, but
+# nothing applies a customisation to either yet; the model may call both.
 CUSTOMISED = %w[task-work task-create]
+MODEL_CALLED = %w[task-plan task-split]
 # Where a command sits in the chain is the start of its description, which the menu shows beside its
 # name. task-customize is no step of the chain and carries no label.
-STEP_LABEL = { "task-create" => "Step 1 — ", "task-plan" => "Step 2 (optional) — ", "task-work" => "Step 3 — " }
+STEP_LABEL = { "task-create" => "Step 1 — ", "task-plan" => "Step 2 (optional) — ",
+               "task-split" => "Step 3 (optional) — ", "task-work" => "Step 4 — " }
 # The one file that says how to get to a plan, as task-plan names it: ${CLAUDE_PLUGIN_ROOT} is
 # replaced in the body of a SKILL.md, so that command can point there from another skill's folder.
+# task-split names it too, for what to read before cutting work that has no map, and names the
+# slicing method beside it for how to cut.
 METHOD_POINTER = "${CLAUDE_PLUGIN_ROOT}/skills/task-work/reference/plan-method.md"
-PUBLISHED = { "task-plan" => %w[locate GATE-1 GATE-2 GATE-3 read ask write report plan-only no-one-to-ask no-secrets] }
+SLICE_POINTER = "${CLAUDE_PLUGIN_ROOT}/skills/task-work/reference/slice-method.md"
+PUBLISHED = {
+  "task-plan" => %w[locate GATE-1 GATE-2 GATE-3 read ask write report plan-only no-one-to-ask no-secrets],
+  "task-split" => %w[locate GATE-1 GATE-2 GATE-3 read cut propose GATE-4 create report split-only no-one-to-ask no-secrets],
+}
 LOADER_RULE = 'Bash("${CLAUDE_PLUGIN_ROOT}/scripts/lorvel-load" *)'
 HEREDOC = "<<'LORVEL_SESSION_FOLDER'"
 # The line the loader prints when there is nothing to apply; task-work and task-create quote it,
@@ -76,7 +85,7 @@ ensure
   dump&.unlink
 end
 
-(CUSTOMISED + %w[task-plan]).each do |skill|
+(CUSTOMISED + MODEL_CALLED).each do |skill|
   path = File.join(PLUGIN, "skills", skill, "SKILL.md")
   (fail("#{skill}: no SKILL.md"); next) unless File.exist?(path)
   text = File.read(path)
@@ -181,8 +190,8 @@ end
       fail("#{skill}: reference/#{File.basename(f)} lacks the sections pointer") unless File.read(f).include?(POINTER[skill])
     end
   else
-    # Nothing applies a customisation to task-plan yet. Neither what the model's list of skills shows
-    # of it nor its body runs the loader, and both scripts refuse its name. A file in .lorvel/ is
+    # Nothing applies a customisation to task-plan or task-split yet. Neither what the model's list
+    # of skills shows of one nor its body runs the loader, and both scripts refuse its name. A file in .lorvel/ is
     # repository text no script has checked for this command, so the body says not to open one, as
     # the other two commands do.
     shown = [front["description"], front["when_to_use"], body].join("\n")
@@ -204,24 +213,39 @@ end
     when_to_use = front["when_to_use"].to_s
     fail("#{skill}: when_to_use lacks one of its two sides") unless when_to_use.include?("Use when") && when_to_use.include?("Do NOT use it")
     fail("#{skill}: runs a command before the model reads it") unless bang_blocks.zero? && inline_bangs.zero?
-    # An ID is public from the commit that declares it: these are the ones this command has
-    # published, and none of them may go. Both of its questions about which task and which plan —
-    # whether to replace the plan the task already has, and whether the task a bare call proposes is
-    # the one to plan — are asked in step 1, before the reading.
+    # An ID is public from the commit that declares it: these are the ones each command has
+    # published, and none of them may go. The questions about which task — and, for task-plan,
+    # whether to replace the plan it already has — are asked in step 1, before the reading; so is
+    # task-split's stop at a subtask, which cannot have subtasks of its own. task-split's approval
+    # sits in the step that shows the split: no create_task comes before it.
     gone = PUBLISHED[skill] - ids
     fail("#{skill}: IDs gone: #{gone}") unless gone.empty?
-    %w[GATE-2 GATE-3].each do |gate|
+    gate_steps = if skill == "task-plan"
+                   { "GATE-2" => %w[locate], "GATE-3" => %w[locate] }
+                 else
+                   { "GATE-1" => %w[locate], "GATE-2" => %w[locate], "GATE-3" => %w[locate], "GATE-4" => %w[propose] }
+                 end
+    gate_steps.each do |gate, want|
       row = rows.find { |r| r["id"] == gate } || {}
-      fail("#{skill}: #{gate} sits in #{row["in"].inspect}, not in step 1") unless row["in"] == %w[locate]
+      fail("#{skill}: #{gate} sits in #{row["in"].inspect}, not in #{want}") unless row["in"] == want
     end
-    # A bare call proposes only a task this conversation created; it never picks one, and never
-    # looks one up on the server.
+    # A bare call proposes only a task this conversation created or planned; it never picks one,
+    # and never looks one up on the server.
     fail("#{skill}: lacks the rule against picking or looking up a task") unless body.include?("Never pick a task yourself, and never go looking for one: no `list_tasks`, no `search_tasks`.")
-    # It holds no planning method of its own: it names the one file, and the section of the guide
-    # that says what a plan holds.
+    # Neither holds a method of its own: task-plan names the planning method and the section of the
+    # guide that says what a plan holds; task-split names the slicing method, and the planning
+    # method's reading list for work it has to cut itself.
     fail("#{skill}: does not point to the planning method") unless body.include?("`#{METHOD_POINTER}`")
     fail("#{skill}: the planning method it points to is missing") unless File.exist?(METHOD_POINTER.sub("${CLAUDE_PLUGIN_ROOT}", PLUGIN))
-    fail("#{skill}: does not name the guide's section") unless body.include?('the "Writing a plan" section of `task_authoring_guide`')
+    if skill == "task-plan"
+      fail("#{skill}: does not name the guide's section") unless body.include?('the "Writing a plan" section of `task_authoring_guide`')
+    else
+      fail("#{skill}: does not point to the slicing method") unless body.include?("`#{SLICE_POINTER}`")
+      fail("#{skill}: the slicing method it points to is missing") unless File.exist?(SLICE_POINTER.sub("${CLAUDE_PLUGIN_ROOT}", PLUGIN))
+      fail("#{skill}: does not name the planning method's reading list") unless body.include?('the "Read before you write" section of the planning method')
+      # The approval has no off switch: no flag, no word in the request, no customisation.
+      fail("#{skill}: does not say that nothing switches the approval off") unless body.include?("Nothing switches **GATE-4** off")
+    end
   end
   # The loader prints labels and quoted source phrases on its Sections line, which its last filter
   # takes only in printable ASCII (and its dash).
@@ -347,6 +371,13 @@ Dir[File.join(PLUGIN, "skills", "**", "*.md")].sort.each do |f|
   fail("#{f.delete_prefix(PLUGIN + "/")}: carries the old list of plan headings") if File.read(f).include?("Changes by file")
 end
 puts "plan method: skills/task-work/reference/plan-method.md, named by planning.md beside it; slice-method.md, named by plan-method.md beside it"
+# Planning creates no subtask; task-split creates them, once the user approves the split. The three
+# places that say planning creates none say who does, and every list of the commands names it.
+%w[skills/task-plan/SKILL.md skills/task-work/reference/plan-method.md skills/task-work/reference/planning.md
+   ids.md .claude-plugin/plugin.json ../../README.md ../../.claude-plugin/marketplace.json].each do |rel|
+  f = File.expand_path(rel, PLUGIN)
+  fail("#{rel.delete_prefix("../../")}: does not name /lorvel:task-split or task-split") unless File.exist?(f) && File.read(f) =~ %r{(?:/lorvel:)?task-split}
+end
 
 ids_md = File.read(File.join(PLUGIN, "ids.md"))
 ["- `locked` —", "- `extend` —", "- `replace` —", "- `optional` —", "`metadata.lorvel.ids`", "| `source` |"].each do |s|

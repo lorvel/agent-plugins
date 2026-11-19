@@ -1,6 +1,6 @@
 {
   "command": "lorvel:task-split",
-  "note": "These criteria were written BEFORE the command body, from its definition of done and the seven points the owner settled before it was written, so they describe what the command should do rather than what it happens to do. Eight of them were revised after the review that checked the command: the diff of the commit that adds the command shows which lines. Same shape and same caveats as task-create.json: read them by hand, and see its `runner` note for why this is not the shape `claude plugin eval` executes. \"The slicing method\" in them is `skills/task-work/reference/slice-method.md`, the one file every command of this plugin that cuts work reads; \"the planning method\" is `plan-method.md` beside it, whose \"Read before you write\" section says what to read before cutting work that has no map yet. \"A map\" is a plan, on the task to split, whose steps are slices.",
+  "note": "These criteria were written BEFORE the command body, from its definition of done and the seven points the owner settled before it was written, so they describe what the command should do rather than what it happens to do. Eight of them were revised after the review that checked the command: the diff of the commit that adds the command shows which lines. One line was revised and four cases were added later, before the slicing method stopped letting the parent keep a line that needs work of its own; the commit that adds them says so. `body-work-outside-dod` passed on the command from before that change as well, on a task of this shape, in every run made: it guards against a regression rather than showing a gain. Same shape and same caveats as task-create.json: read them by hand, and see its `runner` note for why this is not the shape `claude plugin eval` executes. \"The slicing method\" in them is `skills/task-work/reference/slice-method.md`, the one file every command of this plugin that cuts work reads; \"the planning method\" is `plan-method.md` beside it, whose \"Read before you write\" section says what to read before cutting work that has no map yet. \"A map\" is a plan, on the task to split, whose steps are slices.",
   "cases": [
     {
       "id": "splits-after-approval",
@@ -10,7 +10,7 @@
         "Step 1 reads the task with `get_task`, calls `task_authoring_guide`, and reads the slicing method with the Read tool, before any question about the task.",
         "The split shown holds the three slices of the map, in its order, and is not cut again.",
         "Each slice shown has its name, with no ordering prefix; what it delivers; a waits-on line, `none` included; the lines of the parent's definition of done it proves; how it is checked on its own; and what it does not cover, where that could be mistaken.",
-        "The split shows which slice owns each line of the parent's definition of done, or that the parent keeps it.",
+        "The split shows which slice owns each line of the parent's definition of done. The parent keeps only a line that holds by itself once every slice is closed, and the split says which lines those are.",
         "It shows the order, which slices could be worked side by side — said to be an estimate — or that none could, and the longest chain of slices that wait on one another.",
         "Before the split is shown, each slice has been checked with `check_similar_tasks`, passing `exclude_ids` with the parent; a hit outside the parent's family is named in the split.",
         "The run waits for the user's answer. Only after the yes does it call `task_authoring_guide` for a fresh token.",
@@ -46,6 +46,18 @@
       "success_criteria": "PASS = every break named in the split with its proposed fix, before the question. FAIL = a break created silently into a subtask, or fixed in a subtask without the user seeing the fix."
     },
     {
+      "id": "map-parent-keeps-work",
+      "query": "/lorvel:task-split AB-12 — a top-level task whose plan maps three slices and says the parent keeps one line of its definition of done: an end-to-end check, made on the dev environment once all three slices are in",
+      "context": "The rest of the map follows the slicing method. Read the split shown before the question; no answer is given.",
+      "expected_behavior": [
+        "The split holds the three slices of the map and does not cut them again.",
+        "Before asking for approval it names the parent keeping the end-to-end line as a place the map breaks the slicing method: that line needs work once the slices are in, so the parent may not keep it.",
+        "The fix it recommends, marked as a proposal, is a slice of its own for that line, which waits on every other slice and comes after them.",
+        "It says the parent's plan will no longer match the split, and leaves the plan alone."
+      ],
+      "success_criteria": "PASS = the end-to-end line named as a break, with a slice of its own proposed for it, before the question; the plan untouched. FAIL = the split leaves the line with the parent without saying so, folds it silently into one of the three slices, or edits the plan."
+    },
+    {
       "id": "no-map-cuts-itself",
       "query": "/lorvel:task-split AB-14 — a top-level task with no plan, whose body holds three outcomes that ship apart",
       "context": "Run inside the repository the task is about.",
@@ -56,6 +68,31 @@
         "The reading changes nothing: no Edit, no Write, no command that changes a file."
       ],
       "success_criteria": "PASS = the planning method's reading list and the slicing method both read before the split is shown, and a split that follows the slicing method. FAIL = a split cut without reading the knowledge or the code, or a demand that the user plan the task first."
+    },
+    {
+      "id": "closing-check-is-a-slice",
+      "query": "/lorvel:task-split AB-12 — a top-level task with no plan, whose body asks for three things that could each ship on their own, and whose definition of done has a line that can only be checked once all three are in: an end-to-end check on the dev environment; then `/lorvel:task-split AB-15` — a task whose work holds one outcome, and whose definition of done also has an end-to-end line",
+      "context": "The project's knowledge base holds a convention that every batch of slices ends with a slice that syncs the knowledge base and waits on all the others. Read the split shown before the question; no answer is given.",
+      "expected_behavior": [
+        "On AB-12, the end-to-end line is owned by a slice of its own. That slice waits on every other slice but the knowledge-sync slice, and comes after them.",
+        "It comes before the knowledge-sync slice the convention asks for, which still waits on every other slice, this one included. The end-to-end check is not folded into the knowledge-sync slice.",
+        "The parent keeps no line of its definition of done that needs work once the slices are in. A line it keeps holds by itself once every slice is closed, and the split says which lines those are.",
+        "On AB-15, the end-to-end line does not make the work worth splitting: the run says the work is better kept as one task, as in `one-outcome`."
+      ],
+      "success_criteria": "PASS = on AB-12, a slice that owns the end-to-end line and waits on every other slice, placed before the knowledge-sync slice, and no line the parent keeps that needs work; on AB-15, no split. FAIL = the parent keeps the end-to-end line, the line is given to a slice that comes before a slice it checks or folded into the knowledge-sync slice, or AB-15 is split because of it."
+    },
+    {
+      "id": "body-work-outside-dod",
+      "query": "/lorvel:task-split AB-12 — a top-level task with no plan whose body asks for two things that could each ship on their own, and also holds an open question and a list of places the work touches — the public API docs, an email to the people affected, the project's activity log — that no line of its definition of done covers",
+      "context": "Its definition of done has no end-to-end line. Read the split shown before the question; no answer is given.",
+      "expected_behavior": [
+        "Before asking for approval, the split names each piece of work the body asks for that no line of the definition of done covers: the open question, and each place the work touches, one by one.",
+        "Each is named with the slice that takes it, and that slice's body then says it delivers it; or it is named as taken by no slice, with why.",
+        "It names no piece of the body's context as work: a sentence that explains why the work exists is not a piece of work.",
+        "It does not edit the parent's body or add a line to its definition of done; a line the user may want added is theirs to add.",
+        "No slice for an end-to-end check appears, since the definition of done asks for none."
+      ],
+      "success_criteria": "PASS = the open question and each place the work touches named before the question, each with the slice that takes it or as taken by none; no context named as work; no end-to-end slice. FAIL = a piece of that work left out of the split, a context sentence listed as work, an end-to-end slice the definition of done does not ask for, or any write to the parent."
     },
     {
       "id": "one-outcome",
@@ -89,6 +126,17 @@
         "Never: an existing subtask edited, closed, dropped or moved; a log entry on a subtask."
       ],
       "success_criteria": "PASS = the question before any `search_knowledge` and any read of the code; the existing subtasks untouched in both runs; nothing written on stop; one new subtask and one log entry on add. FAIL = any write to an existing subtask, or a new slice proposed before the question was answered."
+    },
+    {
+      "id": "subtasks-parent-keeps-work",
+      "query": "/lorvel:task-split AB-12 — a top-level task with two subtasks, both to do, whose definition of done has a line no subtask proves and that needs work once both are in: an end-to-end check",
+      "context": "At the question whether to stop there or add slices, the user says to add slices.",
+      "expected_behavior": [
+        "The map of the subtasks as they stand, shown with the question, names the end-to-end line as one no subtask proves, which the parent cannot keep because it needs work of its own.",
+        "After the answer, the split proposes a slice for that line, waiting on both subtasks; as no subtask waits on it, it appends after them.",
+        "No subtask is edited, closed, dropped or moved."
+      ],
+      "success_criteria": "PASS = the line named in the map before the question, then one new slice proposed for it after both subtasks, and the subtasks untouched. FAIL = the line left with the parent, or a subtask edited to take it."
     },
     {
       "id": "inserts-before-open-slice",

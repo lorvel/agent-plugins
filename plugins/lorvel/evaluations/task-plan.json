@@ -1,6 +1,6 @@
 {
   "command": "lorvel:task-plan",
-  "note": "These criteria were written BEFORE the command body, from its definition of done, so they describe what the command should do rather than what it happens to do. Half of them were revised, and one added, after the review and the runs that checked the command: the diff of the commit that adds the command shows which lines. Same shape and same caveats as task-create.json: read them by hand, and see its `runner` note for why this is not the shape `claude plugin eval` executes. \"The planning method\" in them is the one file every command of this plugin that plans a task reads, `skills/task-work/reference/plan-method.md`. When the user chooses to split the work, that file sends the run on to the slicing method, `skills/task-work/reference/slice-method.md` beside it, for how the slices are cut, ordered and written.",
+  "note": "These criteria were written BEFORE the command body, from its definition of done, so they describe what the command should do rather than what it happens to do. Half of them were revised, and one added, after the review and the runs that checked the command: the diff of the commit that adds the command shows which lines. `split-follows-slice-method` and `parent-with-subtasks` were revised, and `map-names-body-work` added, when the slicing method stopped letting the parent keep a line that needs work of its own. `map-names-body-work` passed on the command from before that change as well, on a task of this shape: it guards against a regression rather than showing a gain. Same shape and same caveats as task-create.json: read them by hand, and see its `runner` note for why this is not the shape `claude plugin eval` executes. \"The planning method\" in them is the one file every command of this plugin that plans a task reads, `skills/task-work/reference/plan-method.md`. When the user chooses to split the work, that file sends the run on to the slicing method, `skills/task-work/reference/slice-method.md` beside it, for how the slices are cut, ordered and written.",
   "cases": [
     {
       "id": "writes-plan-only",
@@ -126,7 +126,7 @@
         "The run does not refuse a task that has subtasks, and does not ask which subtask was meant: the task named is the one planned.",
         "It does not ask whether to split the work: it is split already.",
         "Each subtask is read with `get_task` before the plan is written.",
-        "The plan maps the slices: its steps are the subtasks, in the order they depend on one another, as the planning method says. The subtasks themselves are not reordered.",
+        "The plan maps the slices: its steps are the subtasks, plus any slice the slicing method proposes for a line the parent would keep although it needs work, in the order they depend on one another, as the planning method says. The subtasks themselves are not reordered.",
         "It reads the slicing method, `slice-method.md`, and maps the subtasks as they stand: a waits-on line for each and an owner for every line of the parent's definition of done. A cut that file would not have made is said in the plan; no subtask is changed.",
         "Its log entry says the plan maps slices and is not to be built from.",
         "No subtask is created, edited, reordered or planned: no `create_task`, no `reorder_subtasks`, no `update_task` on any task but AB-7.",
@@ -142,12 +142,23 @@
         "On AB-12 the run reads the slicing method, `slice-method.md` beside the planning method, with the Read tool, before it recommends an answer to the question about splitting, and in any case before the plan is written.",
         "Before the plan is written, it looks with `search_knowledge` for the project's own conventions on splitting work: how work is cut, how slices are named, a slice every batch ends with.",
         "On AB-12, each slice of the map has a name saying what it is, and says what it delivers, which slice or slices it waits on — `none` when it waits on nothing — which lines of the parent's definition of done it proves, and how it is checked on its own.",
-        "Every line of AB-12's definition of done has exactly one owner: a slice that proves it, or the parent, which the map says keeps it. The end-to-end line has an owner too. Work that joins the slices up is a slice, not a line the parent keeps.",
+        "Every line of AB-12's definition of done has exactly one owner. The end-to-end line is owned by a slice of its own, which waits on every other slice; the parent keeps no line that needs work once the slices are in. Work that joins the slices up is a slice too.",
         "No slice comes before a slice it waits on.",
         "No slice name carries an ordering prefix such as `A —` or `Slice 1 —`: the order of the map is the order.",
         "On AB-13 the run writes no map of one slice and no map cut by repository: it says the work holds one outcome that cannot be checked in parts, and asks again before it writes a plan."
       ],
-      "success_criteria": "PASS = on AB-12, a `Read` of `slice-method.md` and a `search_knowledge` on the project's conventions for splitting, both before the plan; and a map in which every slice has a line for what it waits on, every line of the definition of done has exactly one owner, no slice precedes one it waits on, and no slice name carries an ordering prefix. On AB-13, no split and a reply that the work holds one outcome. FAIL = `slice-method.md` not read, a slice with no waits-on line, a line of the definition of done with no owner or with two, a slice ahead of one it waits on, an ordering prefix in a slice name, or AB-13 split."
+      "success_criteria": "PASS = on AB-12, a `Read` of `slice-method.md` and a `search_knowledge` on the project's conventions for splitting, both before the plan; and a map in which every slice has a line for what it waits on, every line of the definition of done has exactly one owner, no slice precedes one it waits on, and no slice name carries an ordering prefix. On AB-13, no split and a reply that the work holds one outcome. FAIL = `slice-method.md` not read, a slice with no waits-on line, a line of the definition of done with no owner or with two, the end-to-end line kept by the parent, a slice ahead of one it waits on, an ordering prefix in a slice name, or AB-13 split."
+    },
+    {
+      "id": "map-names-body-work",
+      "query": "/lorvel:task-plan AB-12 — a task not yet started, with no plan and no subtasks, whose body asks for two things that could each ship on their own, and holds an open question and a list of places the work touches that no line of its definition of done covers",
+      "context": "At the question about splitting, the user answers \"split it\". The definition of done has no end-to-end line. Writes are refused or recorded; nothing is created.",
+      "expected_behavior": [
+        "The map names each piece of work the body asks for that no line of the definition of done covers — the open question, and each place the work touches — with the slice that takes it, or as taken by no slice, with why. The open question may stay among the plan's open questions, as long as the map says which slice settles it.",
+        "It names no sentence of the body's context as work, and adds no slice for an end-to-end check.",
+        "The plan sent to `update_task` is the only write; the body is not edited."
+      ],
+      "success_criteria": "PASS = in the plan sent, the open question and each place the work touches named with a slice or as taken by none; no context listed as work; no end-to-end slice; the body untouched. FAIL = a piece of that work missing from the map, context listed as work, an end-to-end slice nobody asked for, or the body edited."
     },
     {
       "id": "task-language-is-kept",

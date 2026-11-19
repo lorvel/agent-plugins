@@ -52,10 +52,15 @@ one before and nothing keeps the old text. Typed with no task named, it proposes
 created last in the same conversation, and plans it only once you say that is the one; when
 the conversation has created none, it asks which task you mean.
 
-How `/lorvel:task-plan` and `/lorvel:task-work` get to a plan is in one file,
+How `/lorvel:task-plan` and `/lorvel:task-work` get to a plan is in
 `plugins/lorvel/skills/task-work/reference/plan-method.md`: what to read first, what to
-ask before writing, and a few finer rules for writing the steps. What a plan is — its
-parts, which of them are always there — is not in the plugin: it comes from
+ask before writing, and a few finer rules for writing the steps. When you choose to split
+the work, the plan maps its slices instead, and how they are cut is in a second file beside
+it, `slice-method.md`: when to split, one outcome per slice, their order and what each one
+waits on, and who owns each line of the definition of done — a slice, or the task itself.
+Your project's own conventions on splitting, found in its knowledge base, win over that
+file. What a plan is — its parts, which of them are always there — is not in the
+plugin: it comes from
 `task_authoring_guide`, like the shape of a task. `/lorvel:task-work` keeps a plan the
 task already has when it starts, whoever wrote it. It works from that plan instead of
 writing another: it rewrites a line of it only where your answer to one of its questions

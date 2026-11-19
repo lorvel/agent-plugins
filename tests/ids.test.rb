@@ -173,10 +173,11 @@ end
     # Sections apply where they are anchored, so every step file sends the model back to them, in the
     # same words: the rules themselves are in the loader's Sections: line, stated once.
     fail("#{skill}: SKILL.md does not point to the Sections: line") unless body.include?("`Sections:` line")
-    # Two files hold no step of the flow and carry no pointer: the fallback for a lost block, and the
-    # planning method, which is written for any command that plans and not for this one's flow.
+    # Three files hold no step of the flow and carry no pointer: the fallback for a lost block, the
+    # planning method, and the slicing method it sends a split to, both written for any command that
+    # plans and not for this one's flow.
     Dir[File.join(PLUGIN, "skills", skill, "reference", "*.md")].sort.each do |f|
-      next if %w[customisation.md plan-method.md].include?(File.basename(f))
+      next if %w[customisation.md plan-method.md slice-method.md].include?(File.basename(f))
       fail("#{skill}: reference/#{File.basename(f)} lacks the sections pointer") unless File.read(f).include?(POINTER[skill])
     end
   else
@@ -328,10 +329,24 @@ else
 end
 planning = File.read(File.join(PLUGIN, "skills", "task-work", "reference", "planning.md"))
 fail("task-work: reference/planning.md does not point to plan-method.md beside it") unless planning.include?("`plan-method.md`, beside this file")
+# How the slices are cut once the user chooses to split is in a second file beside it,
+# slice-method.md, so the commands that plan and the one that will split cut by one rule. The
+# planning method points to it as a file beside it, and it points back the same way, for the reason
+# above: neither file is a SKILL.md, so ${CLAUDE_PLUGIN_ROOT} would reach the model unreplaced.
+# Like the planning method, it is no step file and says nothing of the customisation of one command.
+slicing = File.join(PLUGIN, "skills", "task-work", "reference", "slice-method.md")
+if File.exist?(slicing)
+  stext = File.read(slicing)
+  fail("slice-method.md speaks of the customisation of one command") if stext.include?("<customisation>") || stext.include?(POINTER["task-work"])
+  fail("slice-method.md names a path through ${CLAUDE_PLUGIN_ROOT}, which Read does not replace") if stext.include?("${CLAUDE_PLUGIN_ROOT}")
+else
+  fail("task-work: reference/slice-method.md is missing")
+end
+fail("plan-method.md does not point to slice-method.md beside it") unless File.exist?(method) && File.read(method).include?("`slice-method.md`, beside this file")
 Dir[File.join(PLUGIN, "skills", "**", "*.md")].sort.each do |f|
   fail("#{f.delete_prefix(PLUGIN + "/")}: carries the old list of plan headings") if File.read(f).include?("Changes by file")
 end
-puts "plan method: skills/task-work/reference/plan-method.md, named by planning.md beside it"
+puts "plan method: skills/task-work/reference/plan-method.md, named by planning.md beside it; slice-method.md, named by plan-method.md beside it"
 
 ids_md = File.read(File.join(PLUGIN, "ids.md"))
 ["- `locked` —", "- `extend` —", "- `replace` —", "- `optional` —", "`metadata.lorvel.ids`", "| `source` |"].each do |s|

@@ -72,7 +72,10 @@ How `/lorvel:task-plan` and `/lorvel:task-work` get to a plan is in
 ask before writing, and a few finer rules for writing the steps. When you choose to split
 the work, the plan maps its slices instead, and how they are cut is in a second file beside
 it, `slice-method.md`: when to split, one outcome per slice, their order and what each one
-waits on, and who owns each line of the definition of done — a slice, or the task itself.
+waits on, and who owns each line of the definition of done — a slice, or the task itself for a
+line that holds once every slice is closed, so closing the last slice leaves the task no work.
+A line that can only be met once every slice is in is owned by a slice of its own, and work the
+task's body asks for that no line of the definition of done covers is named in the map.
 `/lorvel:task-split` cuts by the same file. Your project's own conventions on splitting,
 found in its knowledge base, win over that file. What a plan is — its parts, which of them are always there — is not in the
 plugin: it comes from
@@ -322,7 +325,8 @@ first version was committed before the command existed; half of its cases were t
 revised after the review and the runs that checked the command.
 
 `plugins/lorvel/evaluations/task-split.json` does the same for `/lorvel:task-split`,
-written from its definition of done before the command existed.
+written from its definition of done before the command existed; its note says which cases came
+later.
 
 They are read by hand. The shape is borrowed from another plugin's evaluations
 and is not the shape `claude plugin eval` executes, which is why they sit in

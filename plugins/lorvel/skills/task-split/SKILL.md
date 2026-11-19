@@ -104,7 +104,7 @@ Part of that list cannot be read here — no codebase, no `search_knowledge` ⇒
 ### 3. Cut
 
 - **The task already has subtasks** ⇒ they are slices as they stand: map them as the slicing method says, and change none of them. Propose only slices that none of them delivers. A new slice that a subtask still in the `todo` category waits on goes right before that subtask — never before one that is closed or in progress — and the subtasks that exist keep their order; where no place meets all of that, the split says so and leaves the place to the user.
-- **The plan maps slices** ⇒ the split holds its slices, in its order: do not cut them again. Each place the map breaks the slicing method — a slice with no waits-on line, a name with an ordering prefix, a line of the definition of done with no owner — goes into the split with the fix you recommend, marked as a proposal.
+- **The plan maps slices** ⇒ the split holds its slices, in its order: do not cut them again. Each place the map breaks the slicing method — a slice with no waits-on line, a name with an ordering prefix, a line of the definition of done with no owner, a line the task keeps although it needs work, a piece of the body's work the map does not name — goes into the split with the fix you recommend, marked as a proposal.
 - **No map** ⇒ cut the work as the slicing method says. It holds one outcome, or the cut comes out as one slice ⇒ say the work is better kept as one task, and why, in a line or two, and end: nothing is shown for approval and nothing is written. Told to split it anyway ⇒ ask what outcome each part would ship on its own, rather than cutting by file or by layer.
 - **The plan is a plan of steps, not a map** ⇒ do not use it as one, and do not touch it.
 - **Check the cut once**, as the slicing method's "Check the map once" says. Here it runs on its own: there is no plan draft for it to follow.
@@ -116,7 +116,8 @@ Show the split, in the language of the task:
 
 - **The task**, as a link.
 - **Each new slice, in order, as its subtask will read**: a title, with no ordering prefix unless the project's conventions ask for one, and a body written the way the guide says a body is written, holding what the slicing method says a slice says — what it delivers; what it waits on, `none` included; the lines of the task's definition of done it proves; how it is checked on its own; and what it does not cover, where that could be mistaken. A waits-on line names a subtask that exists by its ref, and a slice still to be created by its title. A slice that goes before a subtask that exists says which, and why.
-- **Who owns each line of the task's definition of done**: a slice, or the task, which keeps the lines no single slice can prove. A line with no owner is named here, before the question.
+- **Who owns each line of the task's definition of done**: a slice, or the task, which keeps only the lines that hold by themselves once every slice is closed. A line with no owner is named here, before the question.
+- **Work the task's body asks for that no line of its definition of done covers**, piece by piece, each with the slice that takes it, or as taken by no slice and why, as the slicing method says.
 - **The order**: which slices could be worked side by side, or that none could, and the longest chain of slices that wait on one another. Side by side is an estimate, made from the repositories and areas the slices name, and the split says so.
 - **What the user should know before saying yes**, where it applies:
   - each place a map breaks the slicing method, with the fix proposed: a yes approves only the fixes shown;

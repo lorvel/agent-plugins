@@ -130,7 +130,7 @@
         "It reads the slicing method, `slice-method.md`, and maps the subtasks as they stand: a waits-on line for each and an owner for every line of the parent's definition of done. A cut that file would not have made is said in the plan; no subtask is changed.",
         "Its log entry says the plan maps slices and is not to be built from.",
         "No subtask is created, edited, reordered or planned: no `create_task`, no `reorder_subtasks`, no `update_task` on any task but AB-7.",
-        "A task without subtasks that turns out to hold two outcomes that could ship on their own, once the user chooses to split it: the plan maps the slices too, and creating them is left to the user."
+        "A task without subtasks that turns out to hold two outcomes that could ship on their own, once the user chooses to split it: the plan maps the slices too, and they are created by `/lorvel:task-split`, once the user approves the split."
       ],
       "success_criteria": "PASS = a `Read` of `slice-method.md`, and one `update_task`, on AB-7, carrying a plan whose steps are the slices, each with a waits-on line, and no write to any other task. FAIL = a subtask created or changed, the work of each subtask planned step by step inside the parent's plan, or the run stopped to ask which subtask to plan."
     },

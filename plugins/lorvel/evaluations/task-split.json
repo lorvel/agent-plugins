@@ -1,6 +1,6 @@
 {
   "command": "lorvel:task-split",
-  "note": "These criteria were written BEFORE the command body, from its definition of done and the seven points the owner settled before it was written, so they describe what the command should do rather than what it happens to do. Eight of them were revised after the review that checked the command: the diff of the commit that adds the command shows which lines. One line was revised and four cases were added later, before the slicing method stopped letting the parent keep a line that needs work of its own; the commit that adds them says so. `body-work-outside-dod` passed on the command from before that change as well, on a task of this shape, in every run made: it guards against a regression rather than showing a gain. Same shape and same caveats as task-create.json: read them by hand, and see its `runner` note for why this is not the shape `claude plugin eval` executes. \"The slicing method\" in them is `skills/task-work/reference/slice-method.md`, the one file every command of this plugin that cuts work reads; \"the planning method\" is `plan-method.md` beside it, whose \"Read before you write\" section says what to read before cutting work that has no map yet. \"A map\" is a plan, on the task to split, whose steps are slices.",
+  "note": "These criteria were written BEFORE the command body, from its definition of done and the seven points the owner settled before it was written, so they describe what the command should do rather than what it happens to do. Eight of them were revised after the review that checked the command: the diff of the commit that adds the command shows which lines. One line was revised and four cases were added later, before the slicing method stopped letting the parent keep a line that needs work of its own; the commit that adds them says so. `body-work-outside-dod` passed on the command from before that change as well, on a task of this shape, in every run made: it guards against a regression rather than showing a gain. `splits-after-approval` was revised, and `split-shown-short` and `show-a-slice` added, before the split shown became a table of one row per slice, with a slice's full body printed only when the user asks; the commit that adds them says so. Same shape and same caveats as task-create.json: read them by hand, and see its `runner` note for why this is not the shape `claude plugin eval` executes. \"The slicing method\" in them is `skills/task-work/reference/slice-method.md`, the one file every command of this plugin that cuts work reads; \"the planning method\" is `plan-method.md` beside it, whose \"Read before you write\" section says what to read before cutting work that has no map yet. \"A map\" is a plan, on the task to split, whose steps are slices.",
   "cases": [
     {
       "id": "splits-after-approval",
@@ -9,18 +9,42 @@
       "expected_behavior": [
         "Step 1 reads the task with `get_task`, calls `task_authoring_guide`, and reads the slicing method with the Read tool, before any question about the task.",
         "The split shown holds the three slices of the map, in its order, and is not cut again.",
-        "Each slice shown has its name, with no ordering prefix; what it delivers; a waits-on line, `none` included; the lines of the parent's definition of done it proves; how it is checked on its own; and what it does not cover, where that could be mistaken.",
+        "The split shown is a table with one row per slice: its name, with no ordering prefix; what it delivers, in a phrase; what it waits on, `none` included; and the lines of the parent's definition of done it proves. No body is printed unless the user asks to see one.",
         "The split shows which slice owns each line of the parent's definition of done. The parent keeps only a line that holds by itself once every slice is closed, and the split says which lines those are.",
         "It shows the order, which slices could be worked side by side — said to be an estimate — or that none could, and the longest chain of slices that wait on one another.",
         "Before the split is shown, each slice has been checked with `check_similar_tasks`, passing `exclude_ids` with the parent; a hit outside the parent's family is named in the split.",
         "The run waits for the user's answer. Only after the yes does it call `task_authoring_guide` for a fresh token.",
         "Then one `create_task` per slice, in the order shown, each with `parent_id` set to the parent's uuid, `title` and `body`, and no `plan`, `status_slug`, `priority` or `assignee`.",
-        "Each body holds what the split showed for that slice and a link to the parent; its waits-on line links each slice it waits on by the ref its `create_task` returned.",
+        "Each `title` is the name the table gave the slice. Each body is the one drafted before the split was shown — what the slice delivers, what it waits on, the lines it proves, how it is checked on its own, what it does not cover where that could be mistaken — and adds no work, decision, line of the definition of done or waits-on line that the table and the lines after it did not state. It links the parent, and its waits-on line links each slice it waits on by the ref its `create_task` returned.",
         "Once the last subtask is created, exactly one `log_progress` on the parent, with no `status` and no `status_slug`. Its note opens by saying the subtasks were created by an agent through `/lorvel:task-split` after the user approved the split, lists each slice with its ref and what it waits on, and says that what it lists is how things stood when they were created.",
         "No other write: no `update_task`, no `reorder_subtasks`, nothing on any other task, no file.",
         "The run ends by reporting the parent and each subtask as links, and stops. It does not start a slice."
       ],
-      "success_criteria": "PASS = after the run, `get_task` on AB-12 shows three subtasks in the order approved, each body matching what was shown for it, one new log entry with no status, and the plan, status, title and body the task had before; the transcript holds no `create_task` before the user's yes. FAIL = a subtask the user was not shown, or shown differently; a slice created out of order; a second log entry written by the run; any status moved; the parent's plan touched; a token fetched before the approval and used after it had expired; or the run carrying on into a slice."
+      "success_criteria": "PASS = after the run, `get_task` on AB-12 shows three subtasks in the order approved, each `title` the name in the table and each body adding nothing the table and the lines after it did not state, one new log entry with no status, and the plan, status, title and body the task had before; the transcript holds no `create_task` before the user's yes. FAIL = a subtask the user was not shown; a `title` other than the name in the table; a body carrying work, a decision, a line of the definition of done or a waits-on line the split did not state; a slice created out of order; a second log entry written by the run; any status moved; the parent's plan touched; a token fetched before the approval and used after it had expired; or the run carrying on into a slice."
+    },
+    {
+      "id": "split-shown-short",
+      "query": "/lorvel:task-split AB-12 — a top-level task whose plan maps four slices that follow the slicing method, the last a knowledge-sync slice the project's conventions ask for",
+      "context": "Read the split shown before the question; no answer is given.",
+      "expected_behavior": [
+        "The split is a table with one row per slice, in order: its name, what it delivers in a phrase, what it waits on (`none` when nothing), and the lines of the parent's definition of done it proves.",
+        "After the table come short lines, each only where it has something to say: who owns each line of the definition of done, the body's work that no line covers with the slice that takes it, which slices could be worked side by side — said to be an estimate — and the longest chain, and what the user should know before saying yes.",
+        "No slice's body is printed, and no name is shortened: each is the full title. One line says how to ask to see the full body of one slice or more, in the language of the task.",
+        "The run then asks for approval, and writes nothing."
+      ],
+      "success_criteria": "PASS = a table of one row per slice, no body printed, a line saying how to see one, and no write. FAIL = full bodies printed without being asked for, a slice missing from the table, or any write."
+    },
+    {
+      "id": "show-a-slice",
+      "query": "/lorvel:task-split AB-12 — as in `split-shown-short`; then the user asks to see slice 2; then the user approves",
+      "context": "One conversation, three turns. Read the tool calls from the transcript, and the subtasks with `get_task` afterwards.",
+      "expected_behavior": [
+        "Asked to see slice 2, the run prints its full body — what it delivers, what it waits on, the lines it proves, how it is checked on its own, what it does not cover where that could be mistaken — with no `create_task` and no other write.",
+        "Seeing a slice is not an approval: the run asks again for approval of the whole split, and waits.",
+        "After the yes, slice 2's subtask has the body that was printed, with only the link to the parent and, where it waits on a new slice, that slice's ref added.",
+        "No subtask's body adds work, a decision, a line of the definition of done or a waits-on line that the table and the lines after it did not state."
+      ],
+      "success_criteria": "PASS = the body printed on request, zero writes before the yes, and slice 2 created with that body plus its links. FAIL = a `create_task` after the request to see a slice and before the yes, a printed body that differs from the one created beyond its links, or a body carrying something the split did not state."
     },
     {
       "id": "nothing-before-approval",
@@ -40,7 +64,7 @@
       "context": "In the map, one slice has no waits-on line, one name starts with `B —`, and one line of the definition of done has no owner.",
       "expected_behavior": [
         "The split still holds the slices of the map, and does not cut them again on its own.",
-        "Before asking for approval it names each place the map breaks the slicing method — the missing waits-on line, the prefix, the line with no owner — each with the fix it recommends, marked as a proposal.",
+        "Before asking for approval it names each place the map breaks the slicing method — the missing waits-on line, the prefix, the line with no owner — each with the fix it recommends, marked as a proposal; the table shows each such slice as fixed.",
         "A yes approves only the fixes that were shown. What the user then approves is what is created; a fix the user was not shown is not slipped into a body."
       ],
       "success_criteria": "PASS = every break named in the split with its proposed fix, before the question. FAIL = a break created silently into a subtask, or fixed in a subtask without the user seeing the fix."

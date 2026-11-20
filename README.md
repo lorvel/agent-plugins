@@ -228,36 +228,56 @@ starting, and stops that command altogether.
 
 ## Updating
 
-This repo ships no `version` field, so a plugin's version is its commit SHA:
-every push to `main` is a new version, and there is no release step.
+This repo ships no `version` field, so a plugin's version is a commit SHA: a
+push to `main` that changes the plugin is a new version, and there is no
+release step.
 
 Nothing updates on its own. Claude Code turns auto-update on by default only
-for Anthropic's own marketplaces and for ones added through claude.ai; every
-other marketplace — this one included — starts with it **off**. So an installed
-plugin stays at the commit you installed it at until you say otherwise. That is
-not a setting anyone forgot to flip: it is what adding a marketplace someone
-else controls is supposed to mean.
+for most of Anthropic's official marketplaces and for ones added through
+claude.ai; every other marketplace — this one included — starts with it
+**off**. So an installed plugin stays at the commit you installed it at until
+you say otherwise. That is not a setting anyone forgot to flip: it is what
+adding a marketplace someone else controls is supposed to mean.
 
 Refresh the marketplace, then the plugin:
 
 ```bash
 claude plugin marketplace update lorvel-plugins
-claude plugin update lorvel
+claude plugin update lorvel@lorvel-plugins
 ```
 
-`claude plugin update` needs a restart to take effect. Installing does the first
-step for you — `claude plugin install lorvel@lorvel-plugins` refreshes the
-marketplace before resolving the plugin, so a freshly pushed plugin installs
-without a manual marketplace update.
+Inside a session, `/plugin` → **Marketplaces** → `lorvel-plugins` → **Update
+marketplace** does both at once.
+
+The new version loads in your next session, or after you run `/reload-plugins`
+in one that is already open. Installing does the first step for you —
+`claude plugin install lorvel@lorvel-plugins` refreshes the marketplace before
+resolving the plugin, so a freshly pushed plugin installs without a manual
+marketplace update. If that refresh fails, the install goes ahead from the copy
+already on the machine and says `marketplace not refreshed`; with
+`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` set, it skips the refresh.
 
 ### Turning auto-update on
 
-`/plugin` → **Marketplaces** → *Enable auto-update*. The toggle lives in that
-menu only; there is no CLI equivalent.
+`/plugin` → **Marketplaces** → `lorvel-plugins` → **Turn on auto-update**, or
+`"autoUpdate": true` in a settings file, as in the team setup below. No
+`claude plugin` command sets it.
+
+Once it is on, the check runs in interactive sessions, and not the moment one
+starts: after your first message, Claude Code waits a random delay of up to ten
+minutes, then refreshes the marketplace and updates the plugin on disk. You see
+`Plugin updated: lorvel · Run /reload-plugins to apply`; the session you are in
+keeps the version it started with until you run that command or start a new
+one.
+
+`DISABLE_AUTOUPDATER=1`, `DISABLE_UPDATES=1` or
+`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` turns that check off and hides the
+toggle, whatever the marketplace is set to — unless `FORCE_AUTOUPDATE_PLUGINS=1`
+is set as well.
 
 It is worth being clear about what you are agreeing to, because the honest
 answer is not "convenience". Auto-update means Claude Code pulls whatever
-`main` happens to say at the start of a session and loads it with your
+`main` happens to say when that check runs and loads it with your
 permissions — plugins are trusted code, closer to something you install than
 something you read. What is in this repo today is mostly Markdown that instructs
 Claude, plus a small loader and writer — three shell scripts and seven awk programs — that runs
@@ -277,7 +297,7 @@ on.
 ### Shared setup for a team
 
 Declare the marketplace and the plugin in `settings.json` (user-level, or a
-project's `.claude/settings.json`) so a teammate gets both on their next start:
+project's `.claude/settings.json`):
 
 ```json
 {
@@ -296,12 +316,28 @@ project's `.claude/settings.json`) so a teammate gets both on their next start:
 }
 ```
 
-`autoUpdate` here is the same switch as the menu toggle above, with the same
-trade-off — decided once for everyone the settings file reaches. That reach is
-the reason to set it deliberately rather than because it came with the snippet:
-drop the line and the marketplace falls back to the default, which is off.
+Claude Code registers the marketplace from these settings once a session has
+started. From a project's file it does so only once the teammate has trusted
+the folder; until then it ignores the entries without a message. Enabling the
+plugin in a project's file does not install it — at most, `/reload-plugins`
+loads it for the session at hand. To keep it, each teammate installs it once
+per clone,
 
-`additionalMarketplaces` is accepted as an alias for `extraKnownMarketplaces`.
+```bash
+claude plugin install lorvel@lorvel-plugins --scope project
+```
+
+or once per machine, for every project, with `--scope user`.
+
+`autoUpdate` here is the value the menu toggle above reads first — flipping the
+toggle also writes it into this entry — so it carries the same trade-off,
+decided once for everyone the settings file reaches. That reach is the reason to
+set it deliberately rather than because it came with the snippet: drop the line
+and each machine's own toggle decides, which starts off.
+
+Claude Code 2.1.327 also reads `additionalMarketplaces` as an alias for
+`extraKnownMarketplaces`. The documentation does not list it, so prefer the
+documented name.
 
 ## What the commands are checked against
 

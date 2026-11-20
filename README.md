@@ -59,9 +59,12 @@ the conversation has created none, it asks which task you mean.
 `/lorvel:task-split` turns a task into subtasks, and nothing else: it creates the slices
 you approve, in their order, and writes one entry in the task's log listing them. No
 subtask is created before you approve the split it shows you — no flag or setting turns
-that off — and no subtask that already exists is edited or closed. When the task's plan
-already maps slices, the split holds them as mapped and proposes a fix wherever the map
-breaks the slicing method; otherwise it reads the task, the knowledge and the code and cuts
+that off — and no subtask that already exists is edited or closed. The split is a short
+table, one row per slice: what it delivers, what it waits on, which lines of the definition
+of done it proves. Ask to see a slice and it prints the full body that slice will be created
+with; seeing a slice is not approving the split. When the task's plan already maps slices,
+the split holds them as mapped and proposes a fix wherever the map breaks the slicing
+method; otherwise it reads the task, the knowledge and the code and cuts
 the work itself, or tells you the work is better kept as one task. For a task that already
 has subtasks, it asks first whether to stop there or add slices, and proposes only the
 slices still missing; one that a subtask still to do waits on is put before it. Pointed at

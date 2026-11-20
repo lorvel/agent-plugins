@@ -12,7 +12,7 @@ metadata:
       - {id: GATE-2, kind: gate, in: [locate], mode: locked, what: "No ref, and the request names no task ⇒ the task this conversation created or planned last is only a proposal; ask, and write nothing until the user says it is the one"}
       - {id: GATE-3, kind: gate, in: [locate], mode: locked, what: "The task is a subtask ⇒ say it cannot be split, and stop"}
       - {id: read, kind: step, mode: extend, what: "Step 2 — read the subtasks and the map, or what the planning method lists; change nothing"}
-      - {id: cut, kind: step, mode: extend, what: "Step 3 — cut the slices as the slicing method says, and check each for duplicates"}
+      - {id: cut, kind: step, mode: extend, what: "Step 3 — cut the slices as the slicing method says, draft each in full, and check each for duplicates"}
       - {id: propose, kind: step, mode: locked, what: "Step 4 — show the split and wait for the user's approval"}
       - {id: GATE-4, kind: gate, in: [propose], mode: locked, what: "No create_task before the user approves, in this run, the split shown last; nothing switches it off"}
       - {id: create, kind: step, mode: extend, what: "Step 5 — create the approved slices, in order"}
@@ -21,7 +21,7 @@ metadata:
         kind: rule
         mode: locked
         what: "Writes the approved subtasks, in order, and one log entry on the task; reorders only to insert: no plan, no status, no subtask that exists changed, no file"
-        source: ["The subtasks the user approved, in the order approved, and one log entry on the task.", "No subtask that exists is edited, closed or dropped", "A subtask holds what the user was shown for it"]
+        source: ["The subtasks the user approved, in the order approved, and one log entry on the task.", "No subtask that exists is edited, closed or dropped", "A subtask only spells out what the split stated"]
       - id: no-one-to-ask
         kind: rule
         mode: locked
@@ -54,7 +54,7 @@ No task to read yet — a bare call that has to ask for the ref — ⇒ ask in t
 
 - **No `plan`, no status, no priority, no assignee** — not on the task, not on a subtask. A `create_task` carries `parent_id`, `title`, `body` and `token`, and nothing more.
 - **No subtask that exists is edited, closed or dropped**, none gets a log entry, and their order among themselves does not change. The one write that touches them is a `reorder_subtasks` that puts a new slice before one of them, where the approved split says so.
-- **A subtask holds what the user was shown for it.** Once the split is approved, nothing is added to a body but the link to the task and the refs of the slices it waits on.
+- **A subtask only spells out what the split stated.** Its `title` is the name the split's table gives it. Its `body` is the one drafted at step 3, as the user asked it changed — the one they can ask to see. It adds how the slice is checked on its own and what it does not cover, and nothing else: no work, decision, line of the task's definition of done or waits-on line that the table and the lines after it do not state. Once the split is approved, nothing is added to a body but the link to the task and the refs of the slices it waits on.
 - **No other task is created or edited. No file of the repository is changed.**
 - **No start on the work**: no plan for a slice, no code, no branch. Finishing step 6 is the end of the command.
 
@@ -75,7 +75,7 @@ No task to read yet — a bare call that has to ask for the ref — ⇒ ask in t
 |---|---|
 | **1** Locate | The task, the guide, the slicing method. **GATE-1**, then **GATE-2** and **GATE-3**. |
 | **2** Read | The subtasks it has, then the map or what the planning method lists. Read only. |
-| **3** Cut | The slices, as the slicing method says; each checked for duplicates. |
+| **3** Cut | The slices, as the slicing method says; each drafted in full and checked for duplicates. |
 | **4** Propose | The split, then **GATE-4**. |
 | **5** Create | The approved slices, in order. |
 | **6** Report | One log entry on the task, the links, stop. |
@@ -108,17 +108,18 @@ Part of that list cannot be read here — no codebase, no `search_knowledge` ⇒
 - **No map** ⇒ cut the work as the slicing method says. It holds one outcome, or the cut comes out as one slice ⇒ say the work is better kept as one task, and why, in a line or two, and end: nothing is shown for approval and nothing is written. Told to split it anyway ⇒ ask what outcome each part would ship on its own, rather than cutting by file or by layer.
 - **The plan is a plan of steps, not a map** ⇒ do not use it as one, and do not touch it.
 - **Check the cut once**, as the slicing method's "Check the map once" says. Here it runs on its own: there is no plan draft for it to follow.
+- **Draft each new slice in full**: a `title`, with no ordering prefix unless the project's conventions ask for one, and a `body` written the way the guide says a body is written, holding what the slicing method says a slice says — what it delivers; what it waits on, `none` included; the lines of the task's definition of done it proves; how it is checked on its own; and what it does not cover, where that could be mistaken. A waits-on line names a subtask that exists by its ref, and a slice still to be created by its title. A slice that goes before a subtask that exists says which, and why. This draft is what the duplicate check below is given, what the user can ask to see, and what step 5 creates.
 - **Duplicates.** Check each new slice with `check_similar_tasks`, passing its title and body, and `exclude_ids` with the task and every subtask it already has. No `exclude_ids` on the tool ⇒ raise `limit` by their number and set them aside yourself. A hit outside that family is named in the split.
 
 ### 4. Propose
 
-Show the split, in the language of the task:
+Show the split, in the language of the task, short enough to take in at a glance: a table, then short lines, each only where it has something to say. No body is printed unless the user asks to see one, and a name is never shortened to fit: it is the full title.
 
 - **The task**, as a link.
-- **Each new slice, in order, as its subtask will read**: a title, with no ordering prefix unless the project's conventions ask for one, and a body written the way the guide says a body is written, holding what the slicing method says a slice says — what it delivers; what it waits on, `none` included; the lines of the task's definition of done it proves; how it is checked on its own; and what it does not cover, where that could be mistaken. A waits-on line names a subtask that exists by its ref, and a slice still to be created by its title. A slice that goes before a subtask that exists says which, and why.
-- **Who owns each line of the task's definition of done**: a slice, or the task, which keeps only the lines that hold by themselves once every slice is closed. A line with no owner is named here, before the question.
+- **The new slices, in order, as a table of one row each**: the name, which is the `title` the subtask will have; what it delivers, in a phrase; what it waits on — `none` when nothing, a subtask that exists by its ref, a slice still to be created by its name; and the lines of the task's definition of done it proves. Where the split proposes a fix to a slice — its name, its waits-on line, a line it takes — its row shows the slice as fixed, marked as a proposal, and its draft carries the fix.
+- **Who owns each line of the task's definition of done**: the table gives the lines each slice proves; this line names those the task keeps — only lines that hold by themselves once every slice is closed — and any line with no owner, before the question.
 - **Work the task's body asks for that no line of its definition of done covers**, piece by piece, each with the slice that takes it, or as taken by no slice and why, as the slicing method says.
-- **The order**: which slices could be worked side by side, or that none could, and the longest chain of slices that wait on one another. Side by side is an estimate, made from the repositories and areas the slices name, and the split says so.
+- **The order**: which slices could be worked side by side, or that none could, and the longest chain of slices that wait on one another; and where a new slice goes before a subtask that exists, which one, and why. Side by side is an estimate, made from the repositories and areas the slices name, and the split says so.
 - **What the user should know before saying yes**, where it applies:
   - each place a map breaks the slicing method, with the fix proposed: a yes approves only the fixes shown;
   - each subtask that exists and will wait on a new slice: its body will not say so, since this command edits no subtask;
@@ -126,14 +127,16 @@ Show the split, in the language of the task:
   - a slice to insert while `reorder_subtasks` is not in this session: it will be created at the end, and its place is the user's to fix;
   - a similar task outside the family, and what of the reading was skipped.
 
-Then ask for approval → **GATE-4**. The user asks for changes ⇒ show the split again as changed, and wait again. No ⇒ the command ends, with nothing written.
+- **How to see a slice in full**: one line saying the user can ask to see the `title` and `body` of one slice or more before answering. Left out where nobody who can answer reads the reply.
+
+Then ask for approval → **GATE-4**. The user asks to see a slice ⇒ print its draft in full, as step 5 will create it less the links step 5 adds, then ask again for approval of the whole split: seeing a slice is not approving it, and a yes after it approves the split as last shown, not that slice alone. The user asks for changes ⇒ change the drafts, and the table and the lines after it with them, so they still state all a draft carries; show the split again as changed, with the draft of each slice the user saw whose change the table does not show; and wait again. No ⇒ the command ends, with nothing written.
 
 ### 5. Create
 
 Only once the user has approved, in this run, the split it showed last:
 
 1. Call `task_authoring_guide` again for a fresh `token`: one fetched before the approval may have expired while the user read.
-2. One `create_task` per new slice, one at a time, in the approved order. Each carries `parent_id` — the task's uuid, the `id` that `get_task` returned, not its ref — `title`, `body` and `token`. The body is the one the split showed, with a link to the task as `lorvel://task/<ref>`; its waits-on line links each slice it waits on the same way, by the ref that slice's `create_task` returned.
+2. One `create_task` per new slice, one at a time, in the approved order. Each carries `parent_id` — the task's uuid, the `id` that `get_task` returned, not its ref — `title`, `body` and `token`. The body is the slice's draft from step 3, as the user asked it changed, with a link to the task as `lorvel://task/<ref>`; its waits-on line links each slice it waits on the same way, by the ref that slice's `create_task` returned.
 3. A slice the split puts before a subtask that exists ⇒ once every slice is created, one `reorder_subtasks` on the task, carrying every one of its subtasks — closed ones too — in the approved order. Refused ⇒ read the task again with `get_task` and send it once more, built from what that returns. Refused again ⇒ leave the order as it is.
 
 - **`create_task` refused for an expired token** ⇒ ordinary, not a fault: call `task_authoring_guide` again for a fresh one, and try that call again once.

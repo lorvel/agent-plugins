@@ -228,9 +228,9 @@ starting, and stops that command altogether.
 
 ## Updating
 
-This repo ships no `version` field, so a plugin's version is a commit SHA: a
-push to `main` that changes the plugin is a new version, and there is no
-release step.
+This repo ships no `version` field, so a plugin's version is the commit SHA of
+this repo: every push to `main` is a new version — one that only touches this
+README too — and there is no release step.
 
 Nothing updates on its own. Claude Code turns auto-update on by default only
 for most of Anthropic's official marketplaces and for ones added through
